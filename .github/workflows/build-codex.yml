@@ -1,0 +1,14 @@
+name: Build Agent Image (codex)
+
+"on":
+  push:
+    tags:
+      - "*"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      tool: codex
+    secrets: inherit

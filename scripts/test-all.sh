@@ -14,8 +14,10 @@ source "${ROOT_DIR}/scripts/common.sh"
 load_env_file
 
 AICAGE_BASE_ALIASES="${AICAGE_BASE_ALIASES:-$(discover_base_aliases)}"
+TOOLS_DIR="${ROOT_DIR}/tools"
 
-for TOOL in ${AICAGE_TOOLS}; do
+for tool_dir in "${TOOLS_DIR}"/*; do
+  TOOL="$(basename "${tool_dir}")"
   for BASE_ALIAS in ${AICAGE_BASE_ALIASES}; do
     IMAGE="${AICAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-latest"
     echo "[test-all] Testing ${IMAGE}" >&2

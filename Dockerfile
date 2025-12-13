@@ -14,8 +14,8 @@ LABEL org.opencontainers.image.title="aicage" \
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Tool installers -----------------------------------------------------------
-RUN --mount=type=bind,source=scripts/installers/,target=/tmp/installers,readonly \
-    /tmp/installers/install_${TOOL}.sh
+RUN --mount=type=bind,source=tools/,target=/tmp/tools,readonly \
+    /tmp/tools/${TOOL}/install.sh
 
 ENV TOOL=${TOOL}
 CMD ["sh", "-c", "$TOOL"]

@@ -1,0 +1,14 @@
+name: Build Agent Image (cline)
+
+"on":
+  push:
+    tags:
+      - "*"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      tool: cline
+    secrets: inherit

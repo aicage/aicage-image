@@ -7,9 +7,10 @@ the agent layers.
 ## Layout
 
 - `Dockerfile` / `docker-bake.hcl` — Buildx entrypoints for agent images.
-- `scripts/` — Build/test helpers and installers.
+- `scripts/` — Build/test helpers.
+- `tools/` — Tool folders with per-tool `install.sh`.
 - `tests/smoke/` — Bats smoke suite shared by all tools.
-- `.env` — Defaults for repositories, platforms, and tool list.
+- `.env` — Defaults for repositories and platforms.
 
 ## Build
 
@@ -35,11 +36,12 @@ scripts/test-all.sh
 
 ## GitHub Actions
 
-`.github/workflows/final-images.yml` builds/tests on tags and pushes to
-`${AICAGE_REPOSITORY}`. Run locally with:
+`.github/workflows/agent-image.yml` is the template; `agent-cline.yml`, `agent-codex.yml`, and
+`agent-droid.yml` call it to build/test/push a single tool against all bases. Run locally (expected
+to fail at Docker Hub login without creds) with:
 
 ```bash
-act -W .github/workflows/final-images.yml -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest
+act -W .github/workflows/build-cline.yml -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest
 ```
 
 ## Configuration
@@ -49,4 +51,6 @@ Key `.env` variables (can be overridden via environment):
 - `AICAGE_BASE_REPOSITORY` — Source repo for base layers (default `wuodan/aicage-image-base`).
 - `AICAGE_VERSION` — Tag suffix, appended as `<tool>-<base>-<version>` (default `dev`).
 - `AICAGE_PLATFORMS` — Space-separated platform list.
-- `AICAGE_TOOLS` — Tool list to build/test.
+
+Tools are discovered from subfolders under `tools/`; add a folder with an `install.sh` to introduce a
+new tool.

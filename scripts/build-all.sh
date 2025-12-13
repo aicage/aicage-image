@@ -35,6 +35,7 @@ fi
 load_env_file
 
 PUSH_FLAG=
+TOOLS_DIR="${ROOT_DIR}/tools"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -64,7 +65,8 @@ done
 AICAGE_BASE_ALIASES="${AICAGE_BASE_ALIASES:-$(discover_base_aliases)}"
 echo "[build-all] Building platforms ${AICAGE_PLATFORMS}." >&2
 
-for tool in ${AICAGE_TOOLS}; do
+for tool_dir in "${TOOLS_DIR}"/*; do
+  tool="$(basename "${tool_dir}")"
   for base_alias in ${AICAGE_BASE_ALIASES}; do
     echo "[build-all] Building ${tool}-${base_alias} (platforms: ${AICAGE_PLATFORMS})" >&2
     "${ROOT_DIR}/scripts/build.sh" \
