@@ -2,8 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TOOLS=()
-BASES=()
 
 die() {
   echo "[build-all] $*" >&2
@@ -30,39 +28,28 @@ USAGE
 # shellcheck source=../scripts/common.sh
 source "${ROOT_DIR}/scripts/common.sh"
 
-init_supported_lists() {
-  split_list "${AICAGE_TOOLS}" TOOLS
-  ensure_base_aliases
-  split_list "${AICAGE_BASE_ALIASES}" BASES
-  [[ ${#TOOLS[@]} -gt 0 ]] || die "AICAGE_TOOLS is empty."
-  [[ ${#BASES[@]} -gt 0 ]] || die "AICAGE_BASE_ALIASES is empty."
-}
-
 if [[ ${1:-} == "-h" || ${1:-} == "--help" ]]; then
   usage
 fi
 
 load_env_file
-init_supported_lists
 
-platform_override=""
-push_flag=""
-version_override=""
+PUSH_FLAG=
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --platform)
       [[ $# -ge 2 ]] || { echo "[build-all] --platform requires a value" >&2; exit 1; }
-      platform_override="$2"
+      AICAGE_PLATFORMS="$2"
       shift 2
       ;;
     --push)
-      push_flag="--push"
+      PUSH_FLAG="--push"
       shift
       ;;
     --version)
       [[ $# -ge 2 ]] || { echo "[build-all] --version requires a value" >&2; exit 1; }
-      version_override="$2"
+      AICAGE_VERSION="$2"
       shift 2
       ;;
     -h|--help)
@@ -74,20 +61,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-platforms=()
-if [[ -n "${platform_override}" ]]; then
-  split_list "${platform_override}" platforms
-  echo "[build-all] Building platform ${platforms[*]}." >&2
-elif [[ -n "${AICAGE_PLATFORMS:-${PLATFORMS:-}}" ]]; then
-  split_list "${AICAGE_PLATFORMS:-${PLATFORMS:-}}" platforms
-  echo "[build-all] Building platforms ${platforms[*]}." >&2
-else
-  die "Platform list is empty; set AICAGE_PLATFORMS or use --platform."
-fi
+AICAGE_BASE_ALIASES="${AICAGE_BASE_ALIASES:-$(discover_base_aliases)}"
+echo "[build-all] Building platforms ${AICAGE_PLATFORMS}." >&2
 
 for tool in ${AICAGE_TOOLS}; do
   for base_alias in ${AICAGE_BASE_ALIASES}; do
     echo "[build-all] Building ${tool}-${base_alias} (platforms: ${AICAGE_PLATFORMS})" >&2
-    "${ROOT_DIR}/scripts/build.sh" --tool "${tool}" --base "${base_alias}" --platform "${AICAGE_PLATFORMS}" --version "${AICAGE_VERSION}" ${push_flag}
+    "${ROOT_DIR}/scripts/build.sh" \
+      --tool "${tool}" \
+      --base "${base_alias}" \
+      --platform "${AICAGE_PLATFORMS}" \
+      --version "${AICAGE_VERSION}" \
+      ${PUSH_FLAG}
   done
 done

@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SMOKE_DIR="${ROOT_DIR}/tests/smoke"
-BATS_ARGS=()
 IMAGE_REF=""
 BATS_TOOL_FILE="${SMOKE_DIR}/tool.bats"
 
@@ -28,43 +27,28 @@ log() {
   printf '[test] %s\n' "$*" >&2
 }
 
-parse_args() {
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --image)
-        [[ $# -ge 2 ]] || usage
-        IMAGE_REF="$2"
-        shift 2
-        ;;
-      -h|--help)
-        usage
-        ;;
-      --)
-        shift
-        BATS_ARGS=("$@")
-        break
-        ;;
-      *)
-        usage
-        ;;
-    esac
-  done
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --image)
+      [[ $# -ge 2 ]] || usage
+      IMAGE_REF="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      usage
+      ;;
+  esac
+done
 
-  if [[ -z "${IMAGE_REF}" ]]; then
-    log "--image is required"
-    usage
-  fi
-}
+[[ -n "${IMAGE_REF}" ]] || { log "--image is required"; usage; }
 
-run_tests() {
-  if [[ ! -e "${BATS_TOOL_FILE}" ]]; then
-    log "Smoke tests not found at ${BATS_TOOL_FILE}."
-    exit 1
-  fi
+if [[ ! -e "${BATS_TOOL_FILE}" ]]; then
+  log "Smoke tests not found at ${BATS_TOOL_FILE}."
+  exit 1
+fi
 
-  log "Running smoke tests via bats"
-  AICAGE_IMAGE="${IMAGE_REF}" bats "${BATS_TOOL_FILE}" "${BATS_ARGS[@]}"
-}
-
-parse_args "$@"
-run_tests
+log "Running smoke tests via bats"
+AICAGE_IMAGE="${IMAGE_REF}" bats "${BATS_TOOL_FILE}" "$@"
