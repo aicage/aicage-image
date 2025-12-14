@@ -1,0 +1,35 @@
+name: Build All Agent Images
+run-name: Dispatch all tools (${{ github.ref_name }})
+
+"on":
+  push:
+    tags:
+      - "*"
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch: {}
+
+concurrency:
+  group: build-all
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    name: Dispatch tool builds
+    runs-on: ubuntu-latest
+    env:
+      REF: ${{ github.ref }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.1
+
+      - name: Dispatch per-tool builds
+        run: |
+          set -euo pipefail
+          for dir in tools/*; do
+            [ -d "${dir}" ] || continue
+            TOOL="$(basename "${dir}")"
+            echo "Dispatching ${TOOL} for ${REF}"
+            gh workflow run build-tool.yml --ref "${REF}" -f tool="${TOOL}"
+          done
