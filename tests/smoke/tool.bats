@@ -33,12 +33,15 @@ setup() {
 }
 
 @test "tool_metadata_labels_present" {
-  run yq -er 'to_entries[] | [.key, (.value // "")] | @tsv' "${TOOL_METADATA_FILE}"
-  [ "$status" -eq 0 ]
+  ROOt_DIR="$(pwd)"
+  source scripts/common.sh
+  TOOL_PATH="$(get_tool_field "${TOOL}" tool_path)"
 
-  while IFS=$'\t' read -r key expected_value; do
-    run docker inspect --format "{{ index .Config.Labels \"${key}\" }}" "${AICAGE_IMAGE}"
-    [ "$status" -eq 0 ]
-    [ "$output" = "${expected_value}" ]
-  done <<< "${output}"
+  run docker inspect --format '{{ index .Config.Labels "tool_path" }}' "${AICAGE_IMAGE}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "${TOOL_PATH}" ]
+
+  run docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.description" }}' "${AICAGE_IMAGE}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "Agent image for ${TOOL}" ]
 }

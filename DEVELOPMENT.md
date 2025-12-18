@@ -1,11 +1,11 @@
 # Development Guide
 
 This repository builds the final agent images. Use it when you need to change agent installers,
-adjust Dockerfiles/Bake targets, or update smoke tests.
+adjust Dockerfiles, or update smoke tests.
 
 ## Prerequisites
 
-- Docker with Buildx (`docker buildx version`).
+- Docker (`docker --version`).
 - QEMU/binfmt for multi-arch builds (often installed with Docker Desktop).
 - Bats (`bats --version`) for smoke suites.
 - yq (`yq --version`) for parsing config and tool metadata.
@@ -21,7 +21,7 @@ pip install -r requirements-dev.txt
 
 ## Repo layout
 
-- `Dockerfile` / `docker-bake.hcl` — Buildx entrypoints for agent images.
+- `Dockerfile` — Build entrypoint for agent images.
 - `tools/<tool>/install.sh` — Installer for each agent.
 - `tools/<tool>/tool.yaml` — Key/value metadata labels baked into the image.
 - `scripts/` — Build and test helpers.
@@ -33,7 +33,7 @@ pip install -r requirements-dev.txt
 `config.yaml` controls defaults:
 
 - `AICAGE_REPOSITORY` (default `wuodan/aicage`)
-- `AICAGE_BASE_REPOSITORY` (default `wuodan/aicage-image-base`)
+- `AICAGE_IMAGE_BASE_REPOSITORY` (default `wuodan/aicage-image-base`)
 - `AICAGE_VERSION` (default `dev`)
 - `AICAGE_PLATFORMS` (default `linux/amd64 linux/arm64`)
 Base aliases are discovered from `<alias>-latest` tags in the base repository unless you override
@@ -42,11 +42,11 @@ Base aliases are discovered from `<alias>-latest` tags in the base repository un
 ## Build
 
 ```bash
-# Build and load a single agent image
-scripts/build.sh --tool codex --base ubuntu --platform linux/amd64
+# Build and load a single agent image (host architecture)
+scripts/util/build.sh --tool codex --base ubuntu
 
-# Build the full tool/base matrix (platforms from config.yaml)
-scripts/build-all.sh
+# Build the full tool/base matrix (tags derived from config.yaml)
+scripts/util/build-all.sh
 ```
 
 ## Test
@@ -76,5 +76,6 @@ the desired `<base>-latest` tag exists (or set `AICAGE_BASE_ALIASES`) before bui
 
 ## CI
 
-`aicage-image/.github/workflows/final-images.yml` builds and publishes agent images (multi-arch) on
-tags. Use `act` locally if you need a dry run (requires Docker credentials to push).
+Workflows under `.github/workflows/` dispatch per-tool (`build-tool.yml`) and per-base
+(`build.yml`) builds on tag pushes and on schedule. Each pipeline builds and tests native
+`amd64`/`arm64` images on matching runners, then publishes a multi-arch manifest.

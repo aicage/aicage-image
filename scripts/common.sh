@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+TOOL_DEFINITIONS_DIR="${ROOT_DIR}/tools"
+
 _die() {
   if command -v die >/dev/null 2>&1; then
     die "$@"
@@ -23,25 +25,27 @@ load_config_file() {
 }
 
 discover_base_aliases() {
-  local url="https://hub.docker.com/v2/repositories/${AICAGE_BASE_REPOSITORY}/tags?page_size=100"
+  local url="https://hub.docker.com/v2/repositories/${AICAGE_IMAGE_BASE_REPOSITORY}/tags?page_size=100"
   local json next
-
   while [[ -n "${url}" ]]; do
-    json="$(curl -fsSL "${url}")" || _die "Failed to query Docker Hub for ${AICAGE_BASE_REPOSITORY}"
-    jq -r '.results[].name | select(test("-latest$")) | sub("-latest$"; "")' <<< "${json}"
+    json="$(curl -fsSL "${url}")" || _die "Failed to query Docker Hub for ${AICAGE_IMAGE_BASE_REPOSITORY}"
+    jq -r '.results[].name | select(test("-latest$")) | sub("(-amd64|-arm64)?-latest$"; "")' <<< "${json}"
     next="$(jq -r '.next // empty' <<< "${json}")"
     url="${next}"
-  done
+  done | sort -u
 }
 
-get_tool_metadata() {
+get_tool_field() {
   local tool="$1"
-  local tool_dir="${ROOT_DIR}/tools/${tool}"
+  local field="$2"
+  local tool_dir="${TOOL_DEFINITIONS_DIR}/${tool}"
   local definition_file="${tool_dir}/tool.yaml"
 
-  [[ -d "${tool_dir}" ]] || _die "Tool '${tool}' not found under ${ROOT_DIR}/tools"
+  [[ -d "${tool_dir}" ]] || _die "Tool '${tool}' not found under ${TOOL_DEFINITIONS_DIR}"
   [[ -f "${definition_file}" ]] || _die "Missing tool.yaml for '${tool}'"
-  [[ -s "${definition_file}" ]] || _die "tool.yaml for '${tool}' is empty"
 
-  yq -er 'to_entries[] | [.key, (.value // "")] | @tsv' "${definition_file}"
+  local value
+  value="$(yq -er ".${field}" "${definition_file}")" || _die "Failed to read ${field} from ${definition_file}"
+  [[ -n "${value}" && "${value}" != "null" ]] || _die "${field} missing in ${definition_file}"
+  printf '%s\n' "${value}"
 }
