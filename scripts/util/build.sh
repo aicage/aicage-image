@@ -65,10 +65,12 @@ done
 
 load_config_file
 
-BASE_IMAGE="${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}-latest"
+BASE_IMAGE="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}-latest"
 VERSION_TAG="${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${AICAGE_VERSION}"
 LATEST_TAG="${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-latest"
 TOOL_PATH="$(get_tool_field "${TOOL}" tool_path)"
+TOOL_FULL_NAME="$(get_tool_field "${TOOL}" tool_full_name)"
+TOOL_HOMEPAGE="$(get_tool_field "${TOOL}" tool_homepage)"
 
 (
   echo "[build] Tool=${TOOL}"
@@ -82,8 +84,10 @@ TOOL_PATH="$(get_tool_field "${TOOL}" tool_path)"
 docker build \
   --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
   --build-arg "TOOL=${TOOL}" \
-  --label "tool_path=${TOOL_PATH}" \
   --label "org.opencontainers.image.description=Agent image for ${TOOL}" \
+  --label "org.aicage.tool.tool_path=${TOOL_PATH}" \
+  --label "org.aicage.tool.tool_full_name=${TOOL_FULL_NAME}" \
+  --label "org.aicage.tool.tool_homepage=${TOOL_HOMEPAGE}" \
   --tag "${VERSION_TAG}" \
   --tag "${LATEST_TAG}" \
   "${ROOT_DIR}"

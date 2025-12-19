@@ -1,5 +1,5 @@
 name: Build Agent Image (Template)
-run-name: Build ${{ inputs.base }}-${{ inputs.tool }}
+run-name: Build ${{ inputs.tool }}-${{ inputs.base }}
 
 "on":
   workflow_call:
@@ -28,6 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
   load_config:
     name: Load config file, set variables
     runs-on: ubuntu-latest
@@ -42,6 +43,8 @@ jobs:
       AICAGE_IMAGE_REPOSITORY: ${{ steps.config.outputs.AICAGE_IMAGE_REPOSITORY }}
       BASE_IMAGE: ${{ steps.config.outputs.BASE_IMAGE }}
       TOOL_PATH: ${{ steps.config.outputs.TOOL_PATH }}
+      TOOL_FULL_NAME: ${{ steps.config.outputs.TOOL_FULL_NAME }}
+      TOOL_HOMEPAGE: ${{ steps.config.outputs.TOOL_HOMEPAGE }}
 
     steps:
       - name: Checkout
@@ -68,6 +71,8 @@ jobs:
             echo "AICAGE_IMAGE_REPOSITORY=${AICAGE_IMAGE_REPOSITORY}"
             echo "BASE_IMAGE=${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}-latest"
             echo "TOOL_PATH=$(get_tool_field "${TOOL}" tool_path)"
+            echo "TOOL_FULL_NAME=$(get_tool_field "${TOOL}" tool_full_name)"
+            echo "TOOL_HOMEPAGE=$(get_tool_field "${TOOL}" tool_homepage)"
           } >> "$GITHUB_OUTPUT"
 
   build_amd64:
@@ -80,6 +85,9 @@ jobs:
       BASE_ALIAS: ${{ inputs.base }}
       BASE_IMAGE: ${{ needs.load_config.outputs.BASE_IMAGE }}
       TOOL: ${{ inputs.tool }}
+      TOOL_PATH: ${{ needs.load_config.outputs.TOOL_PATH }}
+      TOOL_FULL_NAME: ${{ needs.load_config.outputs.TOOL_FULL_NAME }}
+      TOOL_HOMEPAGE: ${{ needs.load_config.outputs.TOOL_HOMEPAGE }}
       AICAGE_IMAGE_REGISTRY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REGISTRY }}
       AICAGE_IMAGE_REPOSITORY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REPOSITORY }}
       AICAGE_VERSION: ${{ github.ref_name }}
@@ -120,7 +128,9 @@ jobs:
             ${{ steps.config.outputs.LATEST_TAG }}
           labels: |
             org.opencontainers.image.description=Agent image for ${{ env.TOOL }}
-            tool_path=${{ needs.load_config.outputs.TOOL_PATH }}
+            org.aicage.tool.tool_path=${{ env.TOOL_PATH }}
+            org.aicage.tool.tool_full_name=${{ env.TOOL_FULL_NAME }}
+            org.aicage.tool.tool_homepage=${{ env.TOOL_HOMEPAGE }}
 
       - name: "Test: Setup BATS testing framework"
         uses: mig4/setup-bats@v1.2.0
@@ -153,6 +163,9 @@ jobs:
       BASE_ALIAS: ${{ inputs.base }}
       BASE_IMAGE: ${{ needs.load_config.outputs.BASE_IMAGE }}
       TOOL: ${{ inputs.tool }}
+      TOOL_PATH: ${{ needs.load_config.outputs.TOOL_PATH }}
+      TOOL_FULL_NAME: ${{ needs.load_config.outputs.TOOL_FULL_NAME }}
+      TOOL_HOMEPAGE: ${{ needs.load_config.outputs.TOOL_HOMEPAGE }}
       AICAGE_IMAGE_REGISTRY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REGISTRY }}
       AICAGE_IMAGE_REPOSITORY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REPOSITORY }}
       AICAGE_VERSION: ${{ github.ref_name }}
@@ -193,7 +206,9 @@ jobs:
             ${{ steps.config.outputs.LATEST_TAG }}
           labels: |
             org.opencontainers.image.description=Agent image for ${{ env.TOOL }}
-            tool_path=${{ needs.load_config.outputs.TOOL_PATH }}
+            org.aicage.tool.tool_path=${{ env.TOOL_PATH }}
+            org.aicage.tool.tool_full_name=${{ env.TOOL_FULL_NAME }}
+            org.aicage.tool.tool_homepage=${{ env.TOOL_HOMEPAGE }}
 
       - name: "Test: Setup BATS testing framework"
         uses: mig4/setup-bats@v1.2.0
@@ -250,9 +265,12 @@ jobs:
           LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-latest"
 
           docker buildx imagetools create \
-            -t "${VERSION_TAG}" \
-            -t "${LATEST_TAG}" \
+            --tag "${VERSION_TAG}" \
+            --tag "${LATEST_TAG}" \
             "${{ needs.build_amd64.outputs.VERSION_TAG }}" \
             "${{ needs.build_arm64.outputs.VERSION_TAG }}"
 
-          docker buildx imagetools inspect "${VERSION_TAG}"
+          for tag in "${VERSION_TAG}" "${LATEST_TAG}"; do
+            echo "Inspect tag '${tag}':"
+            docker buildx imagetools inspect "${tag}"
+          done

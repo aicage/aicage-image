@@ -1,1 +1,3 @@
 tool_path: ~/.claude
+tool_full_name: Claude Code
+tool_homepage: https://claude.com/product/claude-code
