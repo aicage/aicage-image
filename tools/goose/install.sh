@@ -18,3 +18,7 @@ if ! command -v goose >/dev/null 2>&1; then
   echo "[install_goose] 'goose' executable not found after installation." >&2
   exit 1
 fi
+
+install -d /usr/share/licenses/goose
+curl -fsSL https://raw.githubusercontent.com/block/goose/main/LICENSE \
+  -o /usr/share/licenses/goose/LICENSE

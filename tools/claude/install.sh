@@ -16,3 +16,7 @@ if ! command -v claude >/dev/null 2>&1; then
   echo "[install_claude] 'claude' executable not found after installation." >&2
   exit 1
 fi
+
+install -d /usr/share/licenses/claude
+curl -fsSL https://www.anthropic.com/legal/consumer-terms \
+  -o /usr/share/licenses/claude/TERMS.html
