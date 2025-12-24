@@ -10,17 +10,19 @@ get_manifest_digest() {
 }
 
 get_last_layer() {
-  local image="$1"
+  local image_repo="$1"
   local digest="$2"
-  skopeo inspect "docker://${image}@${digest}" | jq -r '.Layers[]' | tail -n 1
+  skopeo inspect "docker://${image_repo}@${digest}" | jq -r '.Layers[]' | tail -n 1
 }
 
 needs_rebuild() {
   local tool="$1"
   local base="$2"
   local version="$3"
-  local base_image="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${base}-latest"
-  local final_image="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${tool}-${base}-${version}"
+  local base_repo="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}"
+  local final_repo="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
+  local base_image="${base_repo}:${base}-latest"
+  local final_image="${final_repo}:${tool}-${base}-${version}"
 
   if ! skopeo inspect "docker://${final_image}" >/dev/null 2>&1; then
     echo "${final_image} is missing"
@@ -43,16 +45,16 @@ needs_rebuild() {
     fi
 
     local base_last_layer
-    base_last_layer="$(get_last_layer "${base_image}" "${base_digest}")"
+    base_last_layer="$(get_last_layer "${base_repo}" "${base_digest}")"
     if [[ -z "${base_last_layer}" ]]; then
-      echo "Missing last layer for ${base_image}@${base_digest}"
+      echo "Missing last layer for ${base_repo}@${base_digest}"
       return 0
     fi
 
-    if ! skopeo inspect "docker://${final_image}@${final_digest}" \
+    if ! skopeo inspect "docker://${final_repo}@${final_digest}" \
       | jq -r '.Layers[]' \
       | grep -Fxq "${base_last_layer}"; then
-      echo "${final_image}@${final_digest} missing base layer ${base_last_layer} (${arch})"
+      echo "${final_repo}@${final_digest} missing base layer ${base_last_layer} (${arch})"
       return 0
     fi
   done
