@@ -12,7 +12,7 @@ run-name: Refresh tool-version images (${{ github.ref_name }})
 
 concurrency:
   group: refresh-images
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   refresh:
