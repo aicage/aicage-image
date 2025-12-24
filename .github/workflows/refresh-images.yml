@@ -5,9 +5,9 @@ run-name: Refresh tool-version images (${{ github.ref_name }})
   push:
     tags:
       - "*"
-# The scheduler on GitHub is not reliable enough so a cron job at cron-job.org triggers this by workflow_dispatch
-#   schedule:
-#     - cron: "7,27,47 * * * *"
+  # The scheduler on GitHub is not reliable enough so a cron job at cron-job.org triggers this by workflow_dispatch
+  #   schedule:
+  #     - cron: "7,27,47 * * * *"
   workflow_dispatch: {}
 
 concurrency:
