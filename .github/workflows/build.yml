@@ -25,7 +25,7 @@ run-name: Build ${{ inputs.tool }}-${{ inputs.base }}
 
 concurrency:
   group: build-${{ inputs.base }}-${{ inputs.tool }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
 
