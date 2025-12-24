@@ -16,7 +16,6 @@ Builds the full matrix of <tool>-<base> combinations. Any options after the scri
 forwarded to scripts/util/build.sh for each build.
 
 Options:
-  --version <value>   Override AICAGE_VERSION for this sweep
   -h, --help          Show this help and exit
 USAGE
   exit 1
@@ -32,11 +31,6 @@ fi
 PUSHED_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version)
-      [[ $# -ge 2 ]] || { echo "[build-all] --version requires a value" >&2; exit 1; }
-      AICAGE_VERSION="$2"
-      shift 2
-      ;;
     -h|--help)
       usage
       ;;
@@ -55,11 +49,10 @@ AICAGE_BASE_ALIASES="${AICAGE_BASE_ALIASES:-$(discover_base_aliases)}"
 for tool_dir in "${TOOLS_DIR}"/*; do
   tool="$(basename "${tool_dir}")"
   for base_alias in ${AICAGE_BASE_ALIASES}; do
-    echo "[build-all] Building ${tool}-${base_alias} (version: ${AICAGE_VERSION})" >&2
+    echo "[build-all] Building ${tool}-${base_alias}" >&2
     "${ROOT_DIR}/scripts/util/build.sh" \
       --tool "${tool}" \
       --base "${base_alias}" \
-      --version "${AICAGE_VERSION}" \
       "${PUSHED_ARGS[@]}"
   done
 done

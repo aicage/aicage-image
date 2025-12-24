@@ -35,7 +35,6 @@ jobs:
     env:
       BASE_ALIAS: ${{ inputs.base }}
       TOOL: ${{ inputs.tool }}
-      AICAGE_VERSION: ${{ github.ref_name }}
       ROOT_DIR: ${{ github.workspace }}
     outputs:
       AICAGE_IMAGE_REGISTRY: ${{ steps.config.outputs.AICAGE_IMAGE_REGISTRY }}
@@ -45,6 +44,7 @@ jobs:
       TOOL_PATH: ${{ steps.config.outputs.TOOL_PATH }}
       TOOL_FULL_NAME: ${{ steps.config.outputs.TOOL_FULL_NAME }}
       TOOL_HOMEPAGE: ${{ steps.config.outputs.TOOL_HOMEPAGE }}
+      TOOL_VERSION: ${{ steps.config.outputs.TOOL_VERSION }}
 
     steps:
       - name: Checkout
@@ -65,6 +65,11 @@ jobs:
           set -euo pipefail
           source scripts/common.sh
           load_config_file
+          TOOL_VERSION="$(tools/${TOOL}/version.sh)"
+          if [[ -z "${TOOL_VERSION}" ]]; then
+            echo "Tool version is empty for ${TOOL}" >&2
+            exit 1
+          fi
           {
             echo "AICAGE_IMAGE_REGISTRY=${AICAGE_IMAGE_REGISTRY}"
             echo "AICAGE_IMAGE_BASE_REPOSITORY=${AICAGE_IMAGE_BASE_REPOSITORY}"
@@ -73,6 +78,7 @@ jobs:
             echo "TOOL_PATH=$(get_tool_field "${TOOL}" tool_path)"
             echo "TOOL_FULL_NAME=$(get_tool_field "${TOOL}" tool_full_name)"
             echo "TOOL_HOMEPAGE=$(get_tool_field "${TOOL}" tool_homepage)"
+            echo "TOOL_VERSION=${TOOL_VERSION}"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -98,9 +104,9 @@ jobs:
       TOOL_PATH: ${{ needs.load_config.outputs.TOOL_PATH }}
       TOOL_FULL_NAME: ${{ needs.load_config.outputs.TOOL_FULL_NAME }}
       TOOL_HOMEPAGE: ${{ needs.load_config.outputs.TOOL_HOMEPAGE }}
+      TOOL_VERSION: ${{ needs.load_config.outputs.TOOL_VERSION }}
       AICAGE_IMAGE_REGISTRY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REGISTRY }}
       AICAGE_IMAGE_REPOSITORY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REPOSITORY }}
-      AICAGE_VERSION: ${{ github.ref_name }}
 
     steps:
       - name: Checkout
@@ -111,7 +117,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${ARCH_SUFFIX}-${AICAGE_VERSION}"
+          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${ARCH_SUFFIX}-${TOOL_VERSION}"
           LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${ARCH_SUFFIX}-latest"
           {
             echo "VERSION_TAG=${VERSION_TAG}"
@@ -171,7 +177,7 @@ jobs:
       BASE_ALIAS: ${{ inputs.base }}
       AICAGE_IMAGE_REGISTRY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REGISTRY }}
       AICAGE_IMAGE_REPOSITORY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REPOSITORY }}
-      AICAGE_VERSION: ${{ github.ref_name }}
+      TOOL_VERSION: ${{ needs.load_config.outputs.TOOL_VERSION }}
 
     steps:
       - name: Checkout
@@ -192,11 +198,11 @@ jobs:
       - name: "Create and push multi-arch manifest"
         run: |
           set -euo pipefail
-          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${AICAGE_VERSION}"
+          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${TOOL_VERSION}"
           LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-latest"
 
-          amd64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-amd64-${AICAGE_VERSION}"
-          arm64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-arm64-${AICAGE_VERSION}"
+          amd64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-amd64-${TOOL_VERSION}"
+          arm64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-arm64-${TOOL_VERSION}"
 
           docker buildx imagetools create \
             --tag "${VERSION_TAG}" \

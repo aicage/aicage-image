@@ -1,0 +1,58 @@
+name: Refresh Agent Images (Tool Versions)
+run-name: Refresh tool-version images (${{ github.ref_name }})
+
+"on":
+  push:
+    tags:
+      - "*"
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: refresh-images
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    name: Refresh tool/base images
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REF: ${{ github.ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq skopeo
+
+      - name: Dispatch builds when needed
+        run: |
+          set -euo pipefail
+          source scripts/common.sh
+          source scripts/refresh-images-lib.sh
+          load_config_file
+
+          BASE_ALIASES="$(discover_base_aliases)"
+
+          for dir in tools/*; do
+            [ -d "${dir}" ] || continue
+            TOOL="$(basename "${dir}")"
+            TOOL_VERSION="$(tools/${TOOL}/version.sh)"
+            if [[ -z "${TOOL_VERSION}" ]]; then
+              echo "Tool version is empty for ${TOOL}" >&2
+              exit 1
+            fi
+
+            for BASE_ALIAS in ${BASE_ALIASES}; do
+              if needs_rebuild "${TOOL}" "${BASE_ALIAS}" "${TOOL_VERSION}"; then
+                echo "Dispatching ${TOOL} (${BASE_ALIAS}) for ${REF}"
+                gh workflow run build.yml --ref "${REF}" -f tool="${TOOL}" -f base="${BASE_ALIAS}"
+              else
+                echo "Up-to-date ${TOOL} (${BASE_ALIAS})"
+              fi
+            done
+          done

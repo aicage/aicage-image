@@ -35,7 +35,7 @@ Setting from `config.yaml`:
 - `AICAGE_IMAGE_REGISTRY` (default `ghcr.io`)
 - `AICAGE_IMAGE_BASE_REPOSITORY` (default `aicage/aicage-image-base`)
 - `AICAGE_IMAGE_REPOSITORY` (default `ghcr.io/aicage/aicage`)
-- `AICAGE_VERSION` (default `dev`)
+- Image tags use the tool version from `tools/<tool>/version.sh`.
 
 Base aliases are discovered from `<alias>-latest` tags in the base repository.
 
