@@ -20,6 +20,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       REF: ${{ github.ref }}
+      ROOT_DIR: ${{ github.workspace }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.1
