@@ -13,7 +13,8 @@ source "${ROOT_DIR}/scripts/common.sh"
 
 load_config_file
 
-AICAGE_BASE_ALIASES="${AICAGE_BASE_ALIASES:-$(discover_base_aliases)}"
+BASES_TMPDIR="$(download_bases_archive)"
+AICAGE_BASE_ALIASES="${AICAGE_BASE_ALIASES:-$(list_base_aliases "${BASES_TMPDIR}/bases")}"
 TOOLS_DIR="${ROOT_DIR}/tools"
 
 for tool_dir in "${TOOLS_DIR}"/*; do

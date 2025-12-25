@@ -37,7 +37,8 @@ Setting from `config.yaml`:
 - `AICAGE_IMAGE_REPOSITORY` (default `ghcr.io/aicage/aicage`)
 - Image tags use the tool version from `tools/<tool>/version.sh`.
 
-Base aliases are discovered from `<alias>-latest` tags in the base repository.
+Base aliases are discovered from the latest release artifact
+`https://github.com/<base-repo>/releases/latest/download/bases.tar.gz`.
 
 ## Build
 
@@ -72,7 +73,7 @@ Smoke suites live in `tests/smoke/`; use `bats` directly if you need to run one 
 ## Working with bases
 
 Base layers come from `ghcr.io/aicage/aicage-image-base`. Add or modify bases in that repository, then ensure
-the desired `<base>-latest` tag exists before building here.
+the latest release contains `bases.tar.gz` before building here.
 
 ## CI
 

@@ -39,50 +39,36 @@ get_tool_field() {
   printf '%s\n' "${value}"
 }
 
-# get anonymous pull token (public repo)
-ghcr_pull_token() {
-  local repo="$1"
-  local token
-  token="$(
-    curl -fsSL \
-      "${AICAGE_IMAGE_REGISTRY_API_TOKEN_URL}:${repo}:pull" \
-    | jq -r '.token'
-  )" || _die "Failed to get GHCR token"
-  echo "$token"
+download_bases_archive() {
+  local base_repo="${AICAGE_IMAGE_BASE_REPOSITORY}"
+  local url="https://github.com/${base_repo}/releases/latest/download/bases.tar.gz"
+  local tmpdir
+
+  tmpdir="$(mktemp -d)" || _die "Failed to create temp dir"
+
+  if ! curl -fsSL "${url}" -o "${tmpdir}/bases.tar.gz"; then
+    _die "Failed to download ${url}"
+  fi
+
+  if ! tar -xzf "${tmpdir}/bases.tar.gz" -C "${tmpdir}"; then
+    _die "Failed to unpack ${tmpdir}/bases.tar.gz"
+  fi
+
+  if [[ ! -d "${tmpdir}/bases" ]]; then
+    _die "Missing bases directory in ${url}"
+  fi
+
+  printf '%s\n' "${tmpdir}"
 }
 
-ghcr_list_all_tags() {
-  local repo="$1"
-  local url="${AICAGE_IMAGE_REGISTRY_API_URL}/${repo}/tags/list?n=1000"
-  local token resp body next
+list_base_aliases() {
+  local bases_dir="$1"
 
-  # 1) get pull token
-  token="$(ghcr_pull_token "$repo")"
+  [[ -d "${bases_dir}" ]] || _die "Bases directory not found: ${bases_dir}"
 
-  # 2) paginate
-  while [[ -n "$url" ]]; do
-    resp="$(
-      curl -fsSL -i \
-        -H "Authorization: Bearer ${token}" \
-        "$url"
-    )" || _die "GHCR query failed"
-
-    # 2a) extract JSON body (after first empty line)
-    body="$(sed '1,/^\r\{0,1\}$/d' <<<"$resp")"
-
-    # 2b) output tags
-    jq -r '.tags[]?' <<<"$body"
-
-    # 2c) extract next-page URL from Link header (if any)
-    next="$(sed -n 's/.*<\([^>]*\)>;[[:space:]]*rel="next".*/\1/pI' <<<"$resp")"
-
-    url="$next"
-  done
-}
-
-discover_base_aliases() {
-  ghcr_list_all_tags "${AICAGE_IMAGE_BASE_REPOSITORY}" \
-    | grep -E -- '-latest$' \
-    | sed -E 's/(-amd64|-arm64)?-latest$//' \
-    | sort -u
+  shopt -s nullglob
+  for dir in "${bases_dir}"/*/; do
+    basename "${dir}"
+  done | sort -u
+  shopt -u nullglob
 }

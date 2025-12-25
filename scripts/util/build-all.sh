@@ -44,7 +44,8 @@ done
 load_config_file
 
 TOOLS_DIR="${ROOT_DIR}/tools"
-AICAGE_BASE_ALIASES="${AICAGE_BASE_ALIASES:-$(discover_base_aliases)}"
+BASES_TMPDIR="$(download_bases_archive)"
+AICAGE_BASE_ALIASES="${AICAGE_BASE_ALIASES:-$(list_base_aliases "${BASES_TMPDIR}/bases")}"
 
 for tool_dir in "${TOOLS_DIR}"/*; do
   tool="$(basename "${tool_dir}")"

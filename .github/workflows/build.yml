@@ -5,7 +5,7 @@ run-name: Build ${{ inputs.tool }}-${{ inputs.base }}
   workflow_call:
     inputs:
       base:
-        description: Base alias to build (from scripts/common.sh discover_base_aliases)
+        description: Base alias to build (from bases.tar.gz release artifact)
         required: true
         type: string
       tool:
@@ -15,7 +15,7 @@ run-name: Build ${{ inputs.tool }}-${{ inputs.base }}
   workflow_dispatch:
     inputs:
       base:
-        description: Base alias to build (from scripts/common.sh discover_base_aliases)
+        description: Base alias to build (from bases.tar.gz release artifact)
         required: true
         type: string
       tool:

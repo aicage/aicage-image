@@ -43,7 +43,8 @@ jobs:
             FORCE_BUILD="true"
           fi
 
-          BASE_ALIASES="$(discover_base_aliases)"
+          BASES_TMPDIR="$(download_bases_archive)"
+          BASE_ALIASES="$(list_base_aliases "${BASES_TMPDIR}/bases")"
 
           for dir in tools/*; do
             [ -d "${dir}" ] || continue
