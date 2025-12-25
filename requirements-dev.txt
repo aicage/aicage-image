@@ -3,6 +3,7 @@
 pymarkdownlnt
 pytest
 pytest-cov
+PyYAML
 ruff
 yamllint
 yq
