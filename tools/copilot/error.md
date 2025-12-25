@@ -1,6 +1,7 @@
 # Error
 
-This tool does not work with base `minimal`.
+This tool does not work with bases `alpine` and `minimal` (also alpine).  
+Works with base `fedora`.
 
 ## Details
 
