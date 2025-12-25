@@ -7,4 +7,3 @@ jsonschema
 check-jsonschema
 ruff
 yamllint
-yq

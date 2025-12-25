@@ -20,6 +20,10 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: "Test: Remove Python yq and keep using Go yq"
+        run: |
+          python -m pip uninstall -y yq
+
       - name: "Test: Install lint deps"
         run: |
           python -m pip install --upgrade pip
@@ -50,7 +54,7 @@ jobs:
 
       - name: "Test: Validate images metadata"
         run: |
-          yq '.' images-metadata.yaml > images-metadata.json
+          yq -o=json '.' images-metadata.yaml > images-metadata.json
           check-jsonschema \
             --schemafile doc/validation/images-metadata.schema.json \
             images-metadata.json
