@@ -72,18 +72,16 @@ load_config_file
 
 BASES_TMPDIR="$(download_bases_archive)"
 BASES_DIR="${BASES_TMPDIR}/bases"
+BASE_TAG="$(get_base_release_tag)"
 
 tmp_output="$(mktemp)"
 yq -n '{"aicage-image": {}, "aicage-image-base": {}, "bases": {}, "tool": {}}' > "${tmp_output}"
-
- yq -i '.["aicage-image"].version = "'"${IMAGE_TAG}"'"' "${tmp_output}"
-
-BASE_TAG="$(get_base_release_tag)"
+yq -i '.["aicage-image"].version = "'"${IMAGE_TAG}"'"' "${tmp_output}"
 yq -i '.["aicage-image-base"].version = "'"${BASE_TAG}"'"' "${tmp_output}"
 
 for alias in $(list_base_aliases "${BASES_DIR}"); do
   base_yaml="${BASES_DIR}/${alias}/base.yaml"
-  [[ -f "${base_yaml}" ]] || _die "Missing base.yaml for ${alias}"
+  [[ -f "${base_yaml}" ]] || die "Missing base.yaml for ${alias}"
   yq -i \
     '.bases."'"${alias}"'" = load("'"${base_yaml}"'")' \
     "${tmp_output}"
