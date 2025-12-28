@@ -1,7 +1,7 @@
 # Error
 
-This tool shows an error with base `minimal` and base `fedora`.  
-The error is displayed when exiting the tool right after start by repeatedly pressing Ctrl-C.
+This agent shows an error with base `minimal` and base `fedora`.  
+The error is displayed when exiting the agent right after start by repeatedly pressing Ctrl-C.
 
 ## Details
 

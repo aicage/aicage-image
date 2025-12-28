@@ -12,7 +12,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/util/build-all.sh [build-options]
 
-Builds the full matrix of <tool>-<base> combinations. Any options after the script name are
+Builds the full matrix of <agent>-<base> combinations. Any options after the script name are
 forwarded to scripts/util/build.sh for each build.
 
 Options:
@@ -43,16 +43,16 @@ done
 
 load_config_file
 
-TOOLS_DIR="${ROOT_DIR}/tools"
+AGENTS_DIR="${ROOT_DIR}/agents"
 BASES_TMPDIR="$(download_bases_archive)"
 
-for tool_dir in "${TOOLS_DIR}"/*; do
-  tool="$(basename "${tool_dir}")"
-  AICAGE_BASE_ALIASES="$(get_bases "${tool}" "${BASES_TMPDIR}/bases" "${AICAGE_BASE_ALIASES:-}")"
+for agent_dir in "${AGENTS_DIR}"/*; do
+  agent="$(basename "${agent_dir}")"
+  AICAGE_BASE_ALIASES="$(get_bases "${agent}" "${BASES_TMPDIR}/bases" "${AICAGE_BASE_ALIASES:-}")"
   for base_alias in ${AICAGE_BASE_ALIASES}; do
-    echo "[build-all] Building ${tool}-${base_alias}" >&2
+    echo "[build-all] Building ${agent}-${base_alias}" >&2
     "${ROOT_DIR}/scripts/util/build.sh" \
-      --tool "${tool}" \
+      --agent "${agent}" \
       --base "${base_alias}" \
       "${PUSHED_ARGS[@]}"
   done

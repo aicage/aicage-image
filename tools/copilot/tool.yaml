@@ -1,8 +1,0 @@
-tool_path: ~/.copilot
-tool_full_name: GitHub Copilot CLI
-tool_homepage: https://github.com/features/copilot/cli
-base_exclude:
-  - alpine
-  - minimal
-base_distro_exclude:
-  - Alpine

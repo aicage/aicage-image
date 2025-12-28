@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TOOL_DEFINITIONS_DIR="${ROOT_DIR}/tools"
+AGENT_DEFINITIONS_DIR="${ROOT_DIR}/agents"
 
 _die() {
   if command -v die >/dev/null 2>&1; then
@@ -34,14 +34,14 @@ load_config_file() {
   done < <(yq -er 'to_entries[] | [.key, (.value // "")] | @tsv' "${config_file}")
 }
 
-get_tool_field() {
-  local tool="$1"
+get_agent_field() {
+  local agent="$1"
   local field="$2"
-  local tool_dir="${TOOL_DEFINITIONS_DIR}/${tool}"
-  local definition_file="${tool_dir}/tool.yaml"
+  local agent_dir="${AGENT_DEFINITIONS_DIR}/${agent}"
+  local definition_file="${agent_dir}/agent.yaml"
 
-  [[ -d "${tool_dir}" ]] || _die "Tool '${tool}' not found under ${TOOL_DEFINITIONS_DIR}"
-  [[ -f "${definition_file}" ]] || _die "Missing tool.yaml for '${tool}'"
+  [[ -d "${agent_dir}" ]] || _die "Agent '${agent}' not found under ${AGENT_DEFINITIONS_DIR}"
+  [[ -f "${definition_file}" ]] || _die "Missing agent.yaml for '${agent}'"
 
   local value
   value="$(yq -er ".${field}" "${definition_file}")" || _die "Failed to read ${field} from ${definition_file}"
@@ -49,14 +49,14 @@ get_tool_field() {
   printf '%s\n' "${value}"
 }
 
-get_tool_list_field() {
-  local tool="$1"
+get_agent_list_field() {
+  local agent="$1"
   local field="$2"
-  local tool_dir="${TOOL_DEFINITIONS_DIR}/${tool}"
-  local definition_file="${tool_dir}/tool.yaml"
+  local agent_dir="${AGENT_DEFINITIONS_DIR}/${agent}"
+  local definition_file="${agent_dir}/agent.yaml"
 
-  [[ -d "${tool_dir}" ]] || _die "Tool '${tool}' not found under ${TOOL_DEFINITIONS_DIR}"
-  [[ -f "${definition_file}" ]] || _die "Missing tool.yaml for '${tool}'"
+  [[ -d "${agent_dir}" ]] || _die "Agent '${agent}' not found under ${AGENT_DEFINITIONS_DIR}"
+  [[ -f "${definition_file}" ]] || _die "Missing agent.yaml for '${agent}'"
 
   yq -r ".${field} // [] | .[]" "${definition_file}" \
     || _die "Failed to read ${field} from ${definition_file}"
@@ -134,14 +134,14 @@ list_contains() {
 }
 
 get_bases() {
-  local tool="$1"
+  local agent="$1"
   local bases_dir="$2"
   local base_list="${3:-}"
   local base_aliases
   local -a base_exclude base_distro_exclude
   local alias alias_lc base_yaml distro distro_lc
 
-  [[ -n "${tool}" ]] || _die "Tool name required for base discovery"
+  [[ -n "${agent}" ]] || _die "Agent name required for base discovery"
   [[ -n "${bases_dir}" ]] || _die "Bases directory required for base discovery"
 
   if [[ -n "${base_list}" ]]; then
@@ -151,10 +151,10 @@ get_bases() {
   fi
 
   mapfile -t base_exclude < <(
-    get_tool_list_field "${tool}" base_exclude | tr '[:upper:]' '[:lower:]'
+    get_agent_list_field "${agent}" base_exclude | tr '[:upper:]' '[:lower:]'
   )
   mapfile -t base_distro_exclude < <(
-    get_tool_list_field "${tool}" base_distro_exclude | tr '[:upper:]' '[:lower:]'
+    get_agent_list_field "${agent}" base_distro_exclude | tr '[:upper:]' '[:lower:]'
   )
 
   while IFS= read -r alias; do

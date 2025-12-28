@@ -13,13 +13,13 @@ doc plus `DEVELOPMENT.md` for build/test workflow details.
 ## Testing
 
 - Run `scripts/test-all.sh` after changing installers, Dockerfiles, or entrypoints.
-- For targeted checks, `scripts/test.sh --image <tag> --tool <tool>`; mention any tests you could not
+- For targeted checks, `scripts/test.sh --image <tag> --agent <agent>`; mention any tests you could not
   run.
 
-## Adding or updating tools
+## Adding or updating agents
 
-- New tool steps live in `DEVELOPMENT.md` (installer + smoke tests). Keep smoke coverage in
-  `tests/smoke/<tool>.bats`.
+- New agent steps live in `DEVELOPMENT.md` (installer + smoke tests). Keep smoke coverage in
+  `tests/smoke/<agent>.bats`.
 - Coordinate base changes with `aicage-image-base`; this repo consumes published `<base>-latest`
   tags.
 

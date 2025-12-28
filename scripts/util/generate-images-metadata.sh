@@ -6,8 +6,8 @@ usage() {
 Usage: scripts/util/generate-images-metadata.sh --output <path> --image-tag <tag> [options]
 
 Options:
-  --config <path>     Path to config.yaml (default: config.yaml)
-  --tools-dir <path>  Path to tools directory (default: tools)
+  --config <path>      Path to config.yaml (default: config.yaml)
+  --agents-dir <path>  Path to agents directory (default: agents)
   --output <path>     Output YAML file path (required)
   --image-tag <value> Release tag for aicage-image (required)
   -h, --help          Show this help and exit
@@ -22,7 +22,7 @@ die() {
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CONFIG_PATH="${ROOT_DIR}/config.yaml"
-TOOLS_DIR="${ROOT_DIR}/tools"
+AGENTS_DIR="${ROOT_DIR}/agents"
 OUTPUT_PATH=""
 IMAGE_TAG=""
 
@@ -33,9 +33,9 @@ while [[ $# -gt 0 ]]; do
       CONFIG_PATH="$2"
       shift 2
       ;;
-    --tools-dir)
-      [[ $# -ge 2 ]] || die "--tools-dir requires a value"
-      TOOLS_DIR="$2"
+    --agents-dir)
+      [[ $# -ge 2 ]] || die "--agents-dir requires a value"
+      AGENTS_DIR="$2"
       shift 2
       ;;
     --output)
@@ -61,8 +61,8 @@ done
 [[ -n "${IMAGE_TAG}" ]] || die "--image-tag is required"
 
 ROOT_DIR="$(cd "$(dirname "${CONFIG_PATH}")" && pwd)"
-if [[ "${TOOLS_DIR}" != /* ]]; then
-  TOOLS_DIR="${ROOT_DIR}/${TOOLS_DIR}"
+if [[ "${AGENTS_DIR}" != /* ]]; then
+  AGENTS_DIR="${ROOT_DIR}/${AGENTS_DIR}"
 fi
 
 # shellcheck source=../scripts/common.sh
@@ -75,7 +75,7 @@ BASES_DIR="${BASES_TMPDIR}/bases"
 BASE_TAG="$(get_base_release_tag)"
 
 tmp_output="$(mktemp)"
-yq -n '{"aicage-image": {}, "aicage-image-base": {}, "bases": {}, "tool": {}}' > "${tmp_output}"
+yq -n '{"aicage-image": {}, "aicage-image-base": {}, "bases": {}, "agent": {}}' > "${tmp_output}"
 yq -i '.["aicage-image"].version = "'"${IMAGE_TAG}"'"' "${tmp_output}"
 yq -i '.["aicage-image-base"].version = "'"${BASE_TAG}"'"' "${tmp_output}"
 
@@ -87,26 +87,26 @@ for alias in $(list_base_aliases "${BASES_DIR}"); do
     "${tmp_output}"
 done
 
-for tool_dir in "${TOOLS_DIR}"/*; do
-  [[ -d "${tool_dir}" ]] || continue
-  tool="$(basename "${tool_dir}")"
-  tool_yaml="${tool_dir}/tool.yaml"
-  [[ -f "${tool_yaml}" ]] || continue
+for agent_dir in "${AGENTS_DIR}"/*; do
+  [[ -d "${agent_dir}" ]] || continue
+  agent="$(basename "${agent_dir}")"
+  agent_yaml="${agent_dir}/agent.yaml"
+  [[ -f "${agent_yaml}" ]] || continue
 
-  mapfile -t valid_bases < <(get_bases "${tool}" "${BASES_DIR}")
+  mapfile -t valid_bases < <(get_bases "${agent}" "${BASES_DIR}")
   bases_list="$(mktemp)"
   for base_alias in "${valid_bases[@]}"; do
     printf -- '- %s\n' "${base_alias}" >> "${bases_list}"
   done
 
-  tool_tmp="$(mktemp)"
-  cp "${tool_yaml}" "${tool_tmp}"
-  yq -i '.valid_bases = load("'"${bases_list}"'")' "${tool_tmp}"
+  agent_tmp="$(mktemp)"
+  cp "${agent_yaml}" "${agent_tmp}"
+  yq -i '.valid_bases = load("'"${bases_list}"'")' "${agent_tmp}"
   yq -i \
-    '.tool."'"${tool}"'" = load("'"${tool_tmp}"'")' \
+    '.agent."'"${agent}"'" = load("'"${agent_tmp}"'")' \
     "${tmp_output}"
 
-  rm -f "${bases_list}" "${tool_tmp}"
+  rm -f "${bases_list}" "${agent_tmp}"
 done
 
 mv "${tmp_output}" "${OUTPUT_PATH}"

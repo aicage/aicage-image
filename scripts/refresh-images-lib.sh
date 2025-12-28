@@ -64,13 +64,13 @@ run_cmd() {
 }
 
 needs_rebuild() {
-  local tool="$1"
+  local agent="$1"
   local base="$2"
   local version="$3"
   local base_repo="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}"
   local final_repo="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
   local base_image="${base_repo}:${base}-latest"
-  local final_image="${final_repo}:${tool}-${base}-${version}"
+  local final_image="${final_repo}:${agent}-${base}-${version}"
 
   if ! skopeo inspect "docker://${final_image}" >/dev/null 2>&1; then
     echo "${final_image} is missing"

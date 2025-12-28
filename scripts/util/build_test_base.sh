@@ -5,14 +5,14 @@ BASE="$1"
 
 echo "Testing base: ${BASE}"
 
-for dir in tools/*; do
-  tool="$(basename "${dir}")"
+for dir in agents/*; do
+  agent="$(basename "${dir}")"
 
-  echo "Testing tool: ${tool}"
+  echo "Testing agent: ${agent}"
 
-  scripts/util/build.sh --base "${BASE}" --tool ${tool} \
-    || ( echo "Build tool ${tool} failed" && false )
+  scripts/util/build.sh --base "${BASE}" --agent "${agent}" \
+    || ( echo "Build agent ${agent} failed" && false )
 
-  scripts/test.sh --image "aicage/aicage:${tool}-${BASE}-latest" --tool ${tool} \
-    || ( echo "Testing tool ${tool} failed" && false )
+  scripts/test.sh --image "aicage/aicage:${agent}-${BASE}-latest" --agent "${agent}" \
+    || ( echo "Testing agent ${agent} failed" && false )
 done

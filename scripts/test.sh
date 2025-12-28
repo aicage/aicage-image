@@ -4,19 +4,19 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SMOKE_DIR="${ROOT_DIR}/tests/smoke/"
 IMAGE_REF=""
-TOOL=""
+AGENT=""
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/test.sh --image <image-ref> --tool <tool> [bats-args...]
+Usage: scripts/test.sh --image <image-ref> --agent <agent> [bats-args...]
 
 Options:
   --image <ref>   Image reference to test (required)
-  --tool <tool>   Tool name for smoke tests (required)
+  --agent <agent> Agent name for smoke tests (required)
   -h, --help      Show this help and exit
 
 Examples:
-  scripts/test.sh --image example/aicage:codex-ubuntu-24.04-latest --tool codex
+  scripts/test.sh --image example/aicage:codex-ubuntu-24.04-latest --agent codex
 USAGE
   exit 1
 }
@@ -35,9 +35,9 @@ while [[ $# -gt 0 ]]; do
       IMAGE_REF="$2"
       shift 2
       ;;
-    --tool)
+    --agent)
       [[ $# -ge 2 ]] || usage
-      TOOL="$2"
+      AGENT="$2"
       shift 2
       ;;
     -h|--help)
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "${IMAGE_REF}" ]] || { log "--image is required"; usage; }
-[[ -n "${TOOL}" ]] || { log "--tool is required"; usage; }
+[[ -n "${AGENT}" ]] || { log "--agent is required"; usage; }
 
 log "Running smoke tests via bats"
-AICAGE_IMAGE="${IMAGE_REF}" TOOL="${TOOL}" bats "${SMOKE_DIR}" "$@"
+AICAGE_IMAGE="${IMAGE_REF}" AGENT="${AGENT}" bats "${SMOKE_DIR}" "$@"

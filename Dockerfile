@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.7-labs
 ARG BASE_IMAGE=base
-ARG TOOL=codex
+ARG AGENT=codex
 
 FROM ${BASE_IMAGE} AS runtime
 
-ARG TOOL
+ARG AGENT
 
 LABEL org.opencontainers.image.title="aicage" \
       org.opencontainers.image.description="Multi-base build for agentic developer CLIs" \
@@ -13,9 +13,9 @@ LABEL org.opencontainers.image.title="aicage" \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Tool installers -----------------------------------------------------------
-RUN --mount=type=bind,source=tools/,target=/tmp/tools,readonly \
-    /tmp/tools/${TOOL}/install.sh
+# Agent installers ----------------------------------------------------------
+RUN --mount=type=bind,source=agents/,target=/tmp/agents,readonly \
+    /tmp/agents/${AGENT}/install.sh
 
-ENV TOOL=${TOOL}
-CMD ["sh", "-c", "$TOOL"]
+ENV AGENT=${AGENT}
+CMD ["sh", "-c", "$AGENT"]

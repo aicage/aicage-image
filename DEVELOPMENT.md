@@ -8,7 +8,7 @@ adjust Dockerfiles, or update smoke tests.
 - Docker (`docker --version`).
 - QEMU/binfmt for multi-arch builds (often installed with Docker Desktop).
 - Bats (`bats --version`) for smoke suites.
-- yq (`yq --version`) for parsing config and tool metadata.
+- yq (`yq --version`) for parsing config and agent metadata.
 - Python 3.11+ with `pip install -r requirements-dev.txt` to pull lint/test tooling (e.g., ruff,
   pymarkdown).
 
@@ -22,10 +22,10 @@ pip install -r requirements-dev.txt
 ## Repo layout
 
 - `Dockerfile` — Build entrypoint for agent images.
-- `tools/<tool>/install.sh` — Installer for each agent.
-- `tools/<tool>/tool.yaml` — Key/value metadata labels baked into the image.
+- `agents/<agent>/install.sh` — Installer for each agent.
+- `agents/<agent>/agent.yaml` — Key/value metadata labels baked into the image.
 - `scripts/` — Build and test helpers.
-- `tests/smoke/` — Bats suites that verify each tool’s image.
+- `tests/smoke/` — Bats suites that verify each agent’s image.
 - `config.yaml` — Default repositories, platforms, and version tags.
 
 ## Configuration
@@ -35,7 +35,7 @@ Setting from `config.yaml`:
 - `AICAGE_IMAGE_REGISTRY` (default `ghcr.io`)
 - `AICAGE_IMAGE_BASE_REPOSITORY` (default `aicage/aicage-image-base`)
 - `AICAGE_IMAGE_REPOSITORY` (default `ghcr.io/aicage/aicage`)
-- Image tags use the tool version from `tools/<tool>/version.sh`.
+- Image tags use the agent version from `agents/<agent>/version.sh`.
 
 Base aliases are discovered from the latest release artifact
 `https://github.com/<base-repo>/releases/latest/download/bases.tar.gz`.
@@ -44,9 +44,9 @@ Base aliases are discovered from the latest release artifact
 
 ```bash
 # Build and load a single agent image (host architecture)
-scripts/util/build.sh --tool codex --base ubuntu
+scripts/util/build.sh --agent codex --base ubuntu
 
-# Build the full tool/base matrix (tags derived from config.yaml)
+# Build the full agent/base matrix (tags derived from config.yaml)
 scripts/util/build-all.sh
 ```
 
@@ -54,7 +54,7 @@ scripts/util/build-all.sh
 
 ```bash
 # Test a specific image
-scripts/test.sh --image ghcr.io/aicage/aicage:codex-ubuntu-latest --tool codex
+scripts/test.sh --image ghcr.io/aicage/aicage:codex-ubuntu-latest --agent codex
 
 # Test the full matrix (tags derived from config.yaml and available base aliases)
 scripts/test-all.sh
@@ -62,14 +62,14 @@ scripts/test-all.sh
 
 Smoke suites live in `tests/smoke/`; use `bats` directly if you need to run one file.
 
-## Adding a tool
+## Adding an agent
 
-1. Create `tools/<tool>/install.sh` (executable) that installs the agent; fail fast on errors.
-2. Add `tools/<tool>/tool.yaml` with any metadata that should appear as image labels.
+1. Create `agents/<agent>/install.sh` (executable) that installs the agent; fail fast on errors.
+2. Add `agents/<agent>/agent.yaml` with any metadata that should appear as image labels.
    Optional filters: `base_exclude` and `base_distro_exclude` (lists).
-3. Add the tool to `AICAGE_TOOLS` in `config.yaml` if it isn’t discovered automatically.
-4. Add smoke coverage in `tests/smoke/<tool>.bats`.
-5. Document the tool in `README.md` if it should be visible to users.
+3. Add the agent to `AICAGE_AGENTS` in `config.yaml` if it isn’t discovered automatically.
+4. Add smoke coverage in `tests/smoke/<agent>.bats`.
+5. Document the agent in `README.md` if it should be visible to users.
 
 ## Working with bases
 
@@ -78,6 +78,6 @@ the latest release contains `bases.tar.gz` before building here.
 
 ## CI
 
-Workflows under `.github/workflows/` dispatch per-tool (`build-tool.yml`) and per-base
+Workflows under `.github/workflows/` dispatch per-agent (`build-agent.yml`) and per-base
 (`build.yml`) builds on tag pushes and on schedule. Each pipeline builds and tests native
 `amd64`/`arm64` images on matching runners, then publishes a multi-arch manifest.
