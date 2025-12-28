@@ -1,5 +1,5 @@
 name: Build Agent Image (Template)
-run-name: Build ${{ inputs.tool }}-${{ inputs.base }}
+run-name: Build ${{ inputs.agent }}-${{ inputs.base }}
 
 "on":
   workflow_call:
@@ -8,8 +8,8 @@ run-name: Build ${{ inputs.tool }}-${{ inputs.base }}
         description: Base alias to build (from bases.tar.gz release artifact)
         required: true
         type: string
-      tool:
-        description: Tool name to build (matches tools/<tool>)
+      agent:
+        description: Agent name to build (matches agents/<agent>)
         required: true
         type: string
   workflow_dispatch:
@@ -18,13 +18,13 @@ run-name: Build ${{ inputs.tool }}-${{ inputs.base }}
         description: Base alias to build (from bases.tar.gz release artifact)
         required: true
         type: string
-      tool:
-        description: Tool name to build (matches tools/<tool>)
+      agent:
+        description: Agent name to build (matches agents/<agent>)
         required: true
         type: string
 
 concurrency:
-  group: build-${{ inputs.base }}-${{ inputs.tool }}
+  group: build-${{ inputs.base }}-${{ inputs.agent }}
   cancel-in-progress: false
 
 jobs:
@@ -34,17 +34,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BASE_ALIAS: ${{ inputs.base }}
-      TOOL: ${{ inputs.tool }}
+      AGENT: ${{ inputs.agent }}
       ROOT_DIR: ${{ github.workspace }}
     outputs:
       AICAGE_IMAGE_REGISTRY: ${{ steps.config.outputs.AICAGE_IMAGE_REGISTRY }}
       AICAGE_IMAGE_BASE_REPOSITORY: ${{ steps.config.outputs.AICAGE_IMAGE_BASE_REPOSITORY }}
       AICAGE_IMAGE_REPOSITORY: ${{ steps.config.outputs.AICAGE_IMAGE_REPOSITORY }}
       BASE_IMAGE: ${{ steps.config.outputs.BASE_IMAGE }}
-      TOOL_PATH: ${{ steps.config.outputs.TOOL_PATH }}
-      TOOL_FULL_NAME: ${{ steps.config.outputs.TOOL_FULL_NAME }}
-      TOOL_HOMEPAGE: ${{ steps.config.outputs.TOOL_HOMEPAGE }}
-      TOOL_VERSION: ${{ steps.config.outputs.TOOL_VERSION }}
+      AGENT_PATH: ${{ steps.config.outputs.AGENT_PATH }}
+      AGENT_FULL_NAME: ${{ steps.config.outputs.AGENT_FULL_NAME }}
+      AGENT_HOMEPAGE: ${{ steps.config.outputs.AGENT_HOMEPAGE }}
+      AGENT_VERSION: ${{ steps.config.outputs.AGENT_VERSION }}
 
     steps:
       - name: Checkout
@@ -70,21 +70,21 @@ jobs:
           ruff check .
           pymarkdown --config .pymarkdown.json scan .
 
-      - name: "Test: Validate config and tools with schemas"
+      - name: "Test: Validate config and agents with schemas"
         run: |
           check-jsonschema \
-            --schemafile doc/validation/tool.schema.json \
-            tools/*/tool.yaml
+            --schemafile doc/validation/agent.schema.json \
+            agents/*/agent.yaml
           check-jsonschema \
             --schemafile doc/validation/config.schema.json \
             config.yaml
 
-      - name: "Test: Validate tool"
+      - name: "Test: Validate agent"
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -d "tools/${TOOL}" ]]; then
-            echo "Tool '${TOOL}' not found under tools/" >&2
+          if [[ ! -d "agents/${AGENT}" ]]; then
+            echo "Agent '${AGENT}' not found under agents/" >&2
             exit 1
           fi
 
@@ -94,15 +94,15 @@ jobs:
           set -euo pipefail
           source scripts/common.sh
           load_config_file
-          TOOL_VERSION="$(tools/${TOOL}/version.sh)"
-          if [[ -z "${TOOL_VERSION}" ]]; then
-            echo "Tool version is empty for ${TOOL}" >&2
+          AGENT_VERSION="$(agents/${AGENT}/version.sh)"
+          if [[ -z "${AGENT_VERSION}" ]]; then
+            echo "Agent version is empty for ${AGENT}" >&2
             exit 1
           fi
           BASES_TMPDIR="$(download_bases_archive)"
-          ALLOWED_BASES="$(get_bases "${TOOL}" "${BASES_TMPDIR}/bases" "${BASE_ALIAS}")"
+          ALLOWED_BASES="$(get_bases "${AGENT}" "${BASES_TMPDIR}/bases" "${BASE_ALIAS}")"
           if ! printf '%s\n' "${ALLOWED_BASES}" | grep -Fxq "${BASE_ALIAS}"; then
-            echo "Base '${BASE_ALIAS}' is excluded for tool '${TOOL}'" >&2
+            echo "Base '${BASE_ALIAS}' is excluded for agent '${AGENT}'" >&2
             exit 1
           fi
           {
@@ -110,14 +110,14 @@ jobs:
             echo "AICAGE_IMAGE_BASE_REPOSITORY=${AICAGE_IMAGE_BASE_REPOSITORY}"
             echo "AICAGE_IMAGE_REPOSITORY=${AICAGE_IMAGE_REPOSITORY}"
             echo "BASE_IMAGE=${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}-latest"
-            echo "TOOL_PATH=$(get_tool_field "${TOOL}" tool_path)"
-            echo "TOOL_FULL_NAME=$(get_tool_field "${TOOL}" tool_full_name)"
-            echo "TOOL_HOMEPAGE=$(get_tool_field "${TOOL}" tool_homepage)"
-            echo "TOOL_VERSION=${TOOL_VERSION}"
+            echo "AGENT_PATH=$(get_agent_field "${AGENT}" agent_path)"
+            echo "AGENT_FULL_NAME=$(get_agent_field "${AGENT}" agent_full_name)"
+            echo "AGENT_HOMEPAGE=$(get_agent_field "${AGENT}" agent_homepage)"
+            echo "AGENT_VERSION=${AGENT_VERSION}"
           } >> "$GITHUB_OUTPUT"
 
   build:
-    name: "${{ matrix.arch }}: Build, test, and publish ${{ inputs.base }}-${{ inputs.tool }}"
+    name: "${{ matrix.arch }}: Build, test, and publish ${{ inputs.base }}-${{ inputs.agent }}"
     runs-on: ${{ matrix.runner }}
     needs: load_config
     strategy:
@@ -135,11 +135,11 @@ jobs:
       ARCH_SUFFIX: ${{ matrix.arch }}
       BASE_ALIAS: ${{ inputs.base }}
       BASE_IMAGE: ${{ needs.load_config.outputs.BASE_IMAGE }}
-      TOOL: ${{ inputs.tool }}
-      TOOL_PATH: ${{ needs.load_config.outputs.TOOL_PATH }}
-      TOOL_FULL_NAME: ${{ needs.load_config.outputs.TOOL_FULL_NAME }}
-      TOOL_HOMEPAGE: ${{ needs.load_config.outputs.TOOL_HOMEPAGE }}
-      TOOL_VERSION: ${{ needs.load_config.outputs.TOOL_VERSION }}
+      AGENT: ${{ inputs.agent }}
+      AGENT_PATH: ${{ needs.load_config.outputs.AGENT_PATH }}
+      AGENT_FULL_NAME: ${{ needs.load_config.outputs.AGENT_FULL_NAME }}
+      AGENT_HOMEPAGE: ${{ needs.load_config.outputs.AGENT_HOMEPAGE }}
+      AGENT_VERSION: ${{ needs.load_config.outputs.AGENT_VERSION }}
       AICAGE_IMAGE_REGISTRY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REGISTRY }}
       AICAGE_IMAGE_REPOSITORY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REPOSITORY }}
 
@@ -152,8 +152,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${ARCH_SUFFIX}-${TOOL_VERSION}"
-          LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${ARCH_SUFFIX}-latest"
+          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-${ARCH_SUFFIX}-${AGENT_VERSION}"
+          LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-${ARCH_SUFFIX}-latest"
           {
             echo "VERSION_TAG=${VERSION_TAG}"
             echo "LATEST_TAG=${LATEST_TAG}"
@@ -171,15 +171,15 @@ jobs:
           load: true
           build-args: |
             BASE_IMAGE=${{ env.BASE_IMAGE }}
-            TOOL=${{ env.TOOL }}
+            AGENT=${{ env.AGENT }}
           tags: |
             ${{ steps.config.outputs.VERSION_TAG }}
             ${{ steps.config.outputs.LATEST_TAG }}
           labels: |
-            org.opencontainers.image.description=Agent image for ${{ env.TOOL }}
-            org.aicage.tool.tool_path=${{ env.TOOL_PATH }}
-            org.aicage.tool.tool_full_name=${{ env.TOOL_FULL_NAME }}
-            org.aicage.tool.tool_homepage=${{ env.TOOL_HOMEPAGE }}
+            org.opencontainers.image.description=Agent image for ${{ env.AGENT }}
+            org.aicage.agent.agent_path=${{ env.AGENT_PATH }}
+            org.aicage.agent.agent_full_name=${{ env.AGENT_FULL_NAME }}
+            org.aicage.agent.agent_homepage=${{ env.AGENT_HOMEPAGE }}
 
       - name: "Test: Setup BATS testing framework"
         uses: mig4/setup-bats@v1.2.0
@@ -187,7 +187,7 @@ jobs:
       - name: "Test: Run smoke suites on final image"
         run: |
           set -euo pipefail
-          scripts/test.sh --image "${VERSION_TAG}" --tool "${TOOL}"
+          scripts/test.sh --image "${VERSION_TAG}" --agent "${AGENT}"
 
       - name: "Publish: Log in to Docker Hub"
         uses: docker/login-action@v3.6.0
@@ -204,15 +204,15 @@ jobs:
 
 
   manifest:
-    name: Publish multi-arch manifest ${{ inputs.base }}-${{ inputs.tool }}
+    name: Publish multi-arch manifest ${{ inputs.base }}-${{ inputs.agent }}
     runs-on: ubuntu-latest
     needs: [load_config, build]
     env:
-      TOOL: ${{ inputs.tool }}
+      AGENT: ${{ inputs.agent }}
       BASE_ALIAS: ${{ inputs.base }}
       AICAGE_IMAGE_REGISTRY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REGISTRY }}
       AICAGE_IMAGE_REPOSITORY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REPOSITORY }}
-      TOOL_VERSION: ${{ needs.load_config.outputs.TOOL_VERSION }}
+      AGENT_VERSION: ${{ needs.load_config.outputs.AGENT_VERSION }}
 
     steps:
       - name: Checkout
@@ -233,11 +233,11 @@ jobs:
       - name: "Create and push multi-arch manifest"
         run: |
           set -euo pipefail
-          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-${TOOL_VERSION}"
-          LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-latest"
+          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-${AGENT_VERSION}"
+          LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-latest"
 
-          amd64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-amd64-${TOOL_VERSION}"
-          arm64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${TOOL}-${BASE_ALIAS}-arm64-${TOOL_VERSION}"
+          amd64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-amd64-${AGENT_VERSION}"
+          arm64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-arm64-${AGENT_VERSION}"
 
           docker buildx imagetools create \
             --tag "${VERSION_TAG}" \

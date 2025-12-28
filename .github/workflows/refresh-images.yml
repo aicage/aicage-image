@@ -1,5 +1,5 @@
-name: Refresh Agent Images (Tool Versions)
-run-name: Refresh tool-version images (${{ github.ref_name }})
+name: Refresh Agent Images (Agent Versions)
+run-name: Refresh agent-version images (${{ github.ref_name }})
 
 "on":
   push:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   refresh:
-    name: Refresh tool/base images
+    name: Refresh agent/base images
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -55,22 +55,22 @@ jobs:
           }
 
           dispatch_build() {
-            local tool="$1"
+            local agent="$1"
             local base_alias="$2"
             local message="$3"
 
             echo "${message}"
-            gh workflow run build.yml --ref "${REF}" -f tool="${tool}" -f base="${base_alias}"
+            gh workflow run build.yml --ref "${REF}" -f agent="${agent}" -f base="${base_alias}"
           }
 
           needs_rebuild_status() {
-            local tool="$1"
+            local agent="$1"
             local base_alias="$2"
-            local tool_version="$3"
+            local agent_version="$3"
             local status output
 
             set +e
-            output="$(needs_rebuild "${tool}" "${base_alias}" "${tool_version}" 2>&1)"
+            output="$(needs_rebuild "${agent}" "${base_alias}" "${agent_version}" 2>&1)"
             status=$?
             set -e
 
@@ -106,55 +106,55 @@ jobs:
           }
 
           run_check() {
-            local tool="$1"
+            local agent="$1"
             local base_alias="$2"
-            local tool_version="$3"
+            local agent_version="$3"
 
             if [[ "${FORCE_BUILD}" == "true" ]]; then
-              dispatch_build "${tool}" "${base_alias}" \
-                "Forcing build for ${tool} (${base_alias}) due to ${GITHUB_EVENT_NAME}"
+              dispatch_build "${agent}" "${base_alias}" \
+                "Forcing build for ${agent} (${base_alias}) due to ${GITHUB_EVENT_NAME}"
               return 0
             fi
 
             local status
-            status="$(needs_rebuild_status "${tool}" "${base_alias}" "${tool_version}")"
+            status="$(needs_rebuild_status "${agent}" "${base_alias}" "${agent_version}")"
             case "${status}" in
               0)
-                dispatch_build "${tool}" "${base_alias}" \
-                  "Dispatching ${tool} (${base_alias}) for ${REF}"
+                dispatch_build "${agent}" "${base_alias}" \
+                  "Dispatching ${agent} (${base_alias}) for ${REF}"
                 return 0
                 ;;
               1)
-                echo "Up-to-date ${tool} (${base_alias})"
+                echo "Up-to-date ${agent} (${base_alias})"
                 return 0
                 ;;
               *)
                 if [[ -n "${NEEDS_REBUILD_OUTPUT}" ]]; then
                   echo "${NEEDS_REBUILD_OUTPUT}" >&2
                 fi
-                echo "Failed to determine rebuild for ${tool} (${base_alias})" >&2
+                echo "Failed to determine rebuild for ${agent} (${base_alias})" >&2
                 return 1
                 ;;
             esac
           }
 
-          for dir in tools/*; do
+          for dir in agents/*; do
             [ -d "${dir}" ] || continue
-            TOOL="$(basename "${dir}")"
-            TOOL_VERSION="$(tools/${TOOL}/version.sh)"
-            if [[ -z "${TOOL_VERSION}" ]]; then
-              echo "Tool version is empty for ${TOOL}" >&2
+            AGENT="$(basename "${dir}")"
+            AGENT_VERSION="$(agents/${AGENT}/version.sh)"
+            if [[ -z "${AGENT_VERSION}" ]]; then
+              echo "Agent version is empty for ${AGENT}" >&2
               exit 1
             fi
-            BASE_ALIASES="$(get_bases "${TOOL}" "${BASES_TMPDIR}/bases")"
+            BASE_ALIASES="$(get_bases "${AGENT}" "${BASES_TMPDIR}/bases")"
 
             for BASE_ALIAS in ${BASE_ALIASES}; do
-              log_file="${LOG_DIR}/$(log_name "${TOOL}_${BASE_ALIAS}").log"
-              run_check "${TOOL}" "${BASE_ALIAS}" "${TOOL_VERSION}" >"${log_file}" 2>&1 &
+              log_file="${LOG_DIR}/$(log_name "${AGENT}_${BASE_ALIAS}").log"
+              run_check "${AGENT}" "${BASE_ALIAS}" "${AGENT_VERSION}" >"${log_file}" 2>&1 &
               pid="$!"
               pids+=("${pid}")
               pid_to_log["${pid}"]="${log_file}"
-              pid_to_label["${pid}"]="${TOOL} (${BASE_ALIAS})"
+              pid_to_label["${pid}"]="${AGENT} (${BASE_ALIAS})"
 
               wait_for_slot
             done

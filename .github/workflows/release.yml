@@ -35,11 +35,11 @@ jobs:
           ruff check .
           pymarkdown --config .pymarkdown.json scan .
 
-      - name: "Test: Validate config and tools with schemas"
+      - name: "Test: Validate config and agents with schemas"
         run: |
           check-jsonschema \
-            --schemafile doc/validation/tool.schema.json \
-            tools/*/tool.yaml
+            --schemafile doc/validation/agent.schema.json \
+            agents/*/agent.yaml
           check-jsonschema \
             --schemafile doc/validation/config.schema.json \
             config.yaml
@@ -48,7 +48,7 @@ jobs:
         run: |
           scripts/util/generate-images-metadata.sh \
             --config config.yaml \
-            --tools-dir tools \
+            --agents-dir agents \
             --output images-metadata.yaml \
             --image-tag "${{ github.ref_name }}"
 
@@ -59,8 +59,8 @@ jobs:
             --schemafile doc/validation/images-metadata.schema.json \
             images-metadata.json
 
-      - name: "Release: Package tools"
-        run: tar -czf tools.tar.gz tools
+      - name: "Release: Package agents"
+        run: tar -czf agents.tar.gz agents
 
       - name: "Release: Create GitHub release"
         uses: softprops/action-gh-release@v2
@@ -68,5 +68,5 @@ jobs:
           name: Release ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            tools.tar.gz
+            agents.tar.gz
             images-metadata.yaml
