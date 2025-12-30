@@ -27,6 +27,11 @@ concurrency:
   group: build-${{ inputs.base }}-${{ inputs.agent }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 jobs:
 
   load_config:
@@ -37,10 +42,11 @@ jobs:
       AGENT: ${{ inputs.agent }}
       ROOT_DIR: ${{ github.workspace }}
     outputs:
-      AICAGE_IMAGE_REGISTRY: ${{ steps.config.outputs.AICAGE_IMAGE_REGISTRY }}
-      AICAGE_IMAGE_BASE_REPOSITORY: ${{ steps.config.outputs.AICAGE_IMAGE_BASE_REPOSITORY }}
-      AICAGE_IMAGE_REPOSITORY: ${{ steps.config.outputs.AICAGE_IMAGE_REPOSITORY }}
       BASE_IMAGE: ${{ steps.config.outputs.BASE_IMAGE }}
+      IMAGE_NAME: ${{ steps.config.outputs.IMAGE_NAME }}
+      MANIFEST_VERSION_TAG: ${{ steps.config.outputs.MANIFEST_VERSION_TAG }}
+      MANIFEST_LATEST_TAG: ${{ steps.config.outputs.MANIFEST_LATEST_TAG }}
+      MANIFEST_TEST_TAG: ${{ steps.config.outputs.MANIFEST_TEST_TAG }}
       AGENT_PATH: ${{ steps.config.outputs.AGENT_PATH }}
       AGENT_FULL_NAME: ${{ steps.config.outputs.AGENT_FULL_NAME }}
       AGENT_HOMEPAGE: ${{ steps.config.outputs.AGENT_HOMEPAGE }}
@@ -94,11 +100,16 @@ jobs:
           set -euo pipefail
           source scripts/common.sh
           load_config_file
+          BASE_IMAGE="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}-latest"
+          IMAGE_NAME="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
           AGENT_VERSION="$(agents/${AGENT}/version.sh)"
           if [[ -z "${AGENT_VERSION}" ]]; then
             echo "Agent version is empty for ${AGENT}" >&2
             exit 1
           fi
+          MANIFEST_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}-${AGENT_VERSION}"
+          MANIFEST_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}-latest"
+          MANIFEST_TEST_TAG="${MANIFEST_VERSION_TAG}-test"
           BASES_TMPDIR="$(download_bases_archive)"
           ALLOWED_BASES="$(get_bases "${AGENT}" "${BASES_TMPDIR}/bases" "${BASE_ALIAS}")"
           if ! printf '%s\n' "${ALLOWED_BASES}" | grep -Fxq "${BASE_ALIAS}"; then
@@ -106,10 +117,11 @@ jobs:
             exit 1
           fi
           {
-            echo "AICAGE_IMAGE_REGISTRY=${AICAGE_IMAGE_REGISTRY}"
-            echo "AICAGE_IMAGE_BASE_REPOSITORY=${AICAGE_IMAGE_BASE_REPOSITORY}"
-            echo "AICAGE_IMAGE_REPOSITORY=${AICAGE_IMAGE_REPOSITORY}"
-            echo "BASE_IMAGE=${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}-latest"
+            echo "BASE_IMAGE=${BASE_IMAGE}"
+            echo "IMAGE_NAME=${IMAGE_NAME}"
+            echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
+            echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
+            echo "MANIFEST_TEST_TAG=${MANIFEST_TEST_TAG}"
             echo "AGENT_PATH=$(get_agent_field "${AGENT}" agent_path)"
             echo "AGENT_FULL_NAME=$(get_agent_field "${AGENT}" agent_full_name)"
             echo "AGENT_HOMEPAGE=$(get_agent_field "${AGENT}" agent_homepage)"
@@ -135,13 +147,15 @@ jobs:
       ARCH_SUFFIX: ${{ matrix.arch }}
       BASE_ALIAS: ${{ inputs.base }}
       BASE_IMAGE: ${{ needs.load_config.outputs.BASE_IMAGE }}
+      IMAGE_NAME: ${{ needs.load_config.outputs.IMAGE_NAME }}
       AGENT: ${{ inputs.agent }}
       AGENT_PATH: ${{ needs.load_config.outputs.AGENT_PATH }}
       AGENT_FULL_NAME: ${{ needs.load_config.outputs.AGENT_FULL_NAME }}
       AGENT_HOMEPAGE: ${{ needs.load_config.outputs.AGENT_HOMEPAGE }}
       AGENT_VERSION: ${{ needs.load_config.outputs.AGENT_VERSION }}
-      AICAGE_IMAGE_REGISTRY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REGISTRY }}
-      AICAGE_IMAGE_REPOSITORY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REPOSITORY }}
+    outputs:
+      AICAGE_IMAGE_DIGEST_amd64: ${{ steps.out.outputs.AICAGE_IMAGE_DIGEST_amd64 }}
+      AICAGE_IMAGE_DIGEST_arm64: ${{ steps.out.outputs.AICAGE_IMAGE_DIGEST_arm64 }}
 
     steps:
       - name: Checkout
@@ -152,29 +166,44 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-${ARCH_SUFFIX}-${AGENT_VERSION}"
-          LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-${ARCH_SUFFIX}-latest"
+          IMAGE_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}-${ARCH_SUFFIX}-${AGENT_VERSION}"
+          IMAGE_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}-${ARCH_SUFFIX}-latest"
+          IMAGE_TEST_TAG="${IMAGE_VERSION_TAG}-test"
           {
-            echo "VERSION_TAG=${VERSION_TAG}"
-            echo "LATEST_TAG=${LATEST_TAG}"
+            echo "IMAGE_VERSION_TAG=${IMAGE_VERSION_TAG}"
+            echo "IMAGE_LATEST_TAG=${IMAGE_LATEST_TAG}"
+            echo "IMAGE_TEST_TAG=${IMAGE_TEST_TAG}"
           } >> "$GITHUB_OUTPUT"
           {
-            echo "VERSION_TAG=${VERSION_TAG}"
-            echo "LATEST_TAG=${LATEST_TAG}"
+            echo "IMAGE_VERSION_TAG=${IMAGE_VERSION_TAG}"
+            echo "IMAGE_LATEST_TAG=${IMAGE_LATEST_TAG}"
+            echo "IMAGE_TEST_TAG=${IMAGE_TEST_TAG}"
           } >> "$GITHUB_ENV"
 
-      - name: Build (local only, leaves image on runner)
+      - name: "Set up Buildx"
+        uses: docker/setup-buildx-action@v3.11.1
+        with:
+          driver: docker-container
+
+      - name: "Log in to Docker Hub"
+        uses: docker/login-action@v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build test image tag
+        id: build_image
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: false
-          load: true
+          push: true
+          provenance: true
           build-args: |
             BASE_IMAGE=${{ env.BASE_IMAGE }}
             AGENT=${{ env.AGENT }}
           tags: |
-            ${{ steps.config.outputs.VERSION_TAG }}
-            ${{ steps.config.outputs.LATEST_TAG }}
+            ${{ steps.config.outputs.IMAGE_TEST_TAG }}
           labels: |
             org.opencontainers.image.description=Agent image for ${{ env.AGENT }}
             org.aicage.agent.agent_path=${{ env.AGENT_PATH }}
@@ -187,21 +216,49 @@ jobs:
       - name: "Test: Run smoke suites on final image"
         run: |
           set -euo pipefail
-          scripts/test.sh --image "${VERSION_TAG}" --agent "${AGENT}"
+          scripts/test.sh --image "${IMAGE_TEST_TAG}" --agent "${AGENT}"
 
-      - name: "Publish: Log in to Docker Hub"
-        uses: docker/login-action@v3.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.0.0
 
-      - name: "Publish: Push architecture-specific image"
+      - name: Sign image with cosign
         run: |
           set -euo pipefail
-          docker push "${VERSION_TAG}"
-          docker push "${LATEST_TAG}"
+          cosign sign --yes \
+            "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}"
 
+      - name: Verify image signature
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            --certificate-identity-regexp \
+              "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/heads/.*$" \
+            "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}"
+
+      - name: "Publish: Set architecture-specific image tag"
+        run: |
+          set -euo pipefail
+          # Promote the already-built & provenanced artifact by digest (no rebuild)
+          docker buildx imagetools create \
+            --tag "${IMAGE_VERSION_TAG}" \
+            --tag "${IMAGE_LATEST_TAG}" \
+            "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}"
+
+      - name: Install ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Delete test image tag
+        run: |
+          set -euo pipefail
+          oras manifest delete "${IMAGE_TEST_TAG}"
+
+      - id: out
+        name: Output variables
+        run: |
+          set -euo pipefail
+          echo "AICAGE_IMAGE_DIGEST_${{ matrix.arch }}=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
+          echo "AICAGE_IMAGE_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
 
   manifest:
     name: Publish multi-arch manifest ${{ inputs.base }}-${{ inputs.agent }}
@@ -210,8 +267,12 @@ jobs:
     env:
       AGENT: ${{ inputs.agent }}
       BASE_ALIAS: ${{ inputs.base }}
-      AICAGE_IMAGE_REGISTRY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REGISTRY }}
-      AICAGE_IMAGE_REPOSITORY: ${{ needs.load_config.outputs.AICAGE_IMAGE_REPOSITORY }}
+      IMAGE_NAME: ${{ needs.load_config.outputs.IMAGE_NAME }}
+      MANIFEST_VERSION_TAG: ${{ needs.load_config.outputs.MANIFEST_VERSION_TAG }}
+      MANIFEST_LATEST_TAG: ${{ needs.load_config.outputs.MANIFEST_LATEST_TAG }}
+      MANIFEST_TEST_TAG: ${{ needs.load_config.outputs.MANIFEST_TEST_TAG }}
+      AICAGE_IMAGE_DIGEST_amd64: ${{ needs.build.outputs.AICAGE_IMAGE_DIGEST_amd64 }}
+      AICAGE_IMAGE_DIGEST_arm64: ${{ needs.build.outputs.AICAGE_IMAGE_DIGEST_arm64 }}
       AGENT_VERSION: ${{ needs.load_config.outputs.AGENT_VERSION }}
 
     steps:
@@ -230,22 +291,46 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: "Create and push multi-arch manifest"
+      - name: "Publish: Create and push multi-arch manifest"
+        id: build_manifest
         run: |
           set -euo pipefail
-          VERSION_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-${AGENT_VERSION}"
-          LATEST_TAG="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-latest"
-
-          amd64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-amd64-${AGENT_VERSION}"
-          arm64_tag="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-arm64-${AGENT_VERSION}"
-
           docker buildx imagetools create \
-            --tag "${VERSION_TAG}" \
-            --tag "${LATEST_TAG}" \
-            "${amd64_tag}" \
-            "${arm64_tag}"
+              --tag "${MANIFEST_TEST_TAG}" \
+              "${AICAGE_IMAGE_DIGEST_amd64}" \
+              "${AICAGE_IMAGE_DIGEST_arm64}"
 
-          for tag in "${VERSION_TAG}" "${LATEST_TAG}"; do
-            echo "Inspect tag '${tag}':"
-            docker buildx imagetools inspect "${tag}"
-          done
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.0.0
+
+      - name: "Publish: Sign multi-arch manifest"
+        run: |
+          set -euo pipefail
+          cosign sign --yes \
+            "${MANIFEST_TEST_TAG}"
+
+      - name: "Test: Verify multi-arch manifest signature"
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            --certificate-identity-regexp \
+              "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/heads/.*$" \
+            "${MANIFEST_TEST_TAG}"
+
+      - name: "Publish: Set tags for multi-arch manifest"
+        run: |
+          set -euo pipefail
+          # Promote the already-built & provenanced artifact by digest (no rebuild)
+          docker buildx imagetools create \
+            --tag "${MANIFEST_VERSION_TAG}" \
+            --tag "${MANIFEST_LATEST_TAG}" \
+            "${MANIFEST_TEST_TAG}"
+
+      - name: Install ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Delete test image tag
+        run: |
+          set -euo pipefail
+          oras manifest delete "${MANIFEST_TEST_TAG}"
