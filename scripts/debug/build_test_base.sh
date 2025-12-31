@@ -10,9 +10,9 @@ for dir in agents/*; do
 
   echo "Testing agent: ${agent}"
 
-  scripts/util/build.sh --base "${BASE}" --agent "${agent}" \
+  scripts/debug/build.sh --base "${BASE}" --agent "${agent}" \
     || ( echo "Build agent ${agent} failed" && false )
 
-  scripts/test.sh --image "aicage/aicage:${agent}-${BASE}-latest" --agent "${agent}" \
+  scripts/test.sh --image "aicage/aicage:${agent}-${BASE}" --agent "${agent}" \
     || ( echo "Testing agent ${agent} failed" && false )
 done

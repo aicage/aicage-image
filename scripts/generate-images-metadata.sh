@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/util/generate-images-metadata.sh --output <path> --image-tag <tag> [options]
+Usage: scripts/generate-images-metadata.sh --output <path> --image-tag <tag> [options]
 
 Options:
   --config <path>      Path to config.yaml (default: config.yaml)

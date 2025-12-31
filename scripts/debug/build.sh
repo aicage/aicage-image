@@ -10,7 +10,7 @@ die() {
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/util/build.sh --agent <agent> --base <alias> [options]
+Usage: scripts/debug/build.sh --agent <agent> --base <alias> [options]
 
 Options:
   --agent <value>      Agent name to build (required)
@@ -18,8 +18,8 @@ Options:
   -h, --help           Show this help and exit
 
 Examples:
-  scripts/util/build.sh --agent cline --base fedora
-  scripts/util/build.sh --agent codex --base ubuntu
+  scripts/debug/build.sh --agent cline --base fedora
+  scripts/debug/build.sh --agent codex --base ubuntu
 USAGE
   exit 1
 }
@@ -65,11 +65,11 @@ if ! printf '%s\n' "${ALLOWED_BASES}" | grep -Fxq "${BASE_ALIAS}"; then
   die "Base '${BASE_ALIAS}' is excluded for agent '${AGENT}'"
 fi
 
-BASE_IMAGE="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}-latest"
+BASE_IMAGE="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}"
 AGENT_VERSION="$("${ROOT_DIR}/agents/${AGENT}/version.sh")"
 [[ -n "${AGENT_VERSION}" ]] || die "Agent version is empty for ${AGENT}"
 VERSION_TAG="${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-${AGENT_VERSION}"
-LATEST_TAG="${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-latest"
+LATEST_TAG="${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}"
 AGENT_PATH="$(get_agent_field "${AGENT}" agent_path)"
 AGENT_FULL_NAME="$(get_agent_field "${AGENT}" agent_full_name)"
 AGENT_HOMEPAGE="$(get_agent_field "${AGENT}" agent_homepage)"

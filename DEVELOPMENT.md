@@ -44,10 +44,10 @@ Base aliases are discovered from the latest release artifact
 
 ```bash
 # Build and load a single agent image (host architecture)
-scripts/util/build.sh --agent codex --base ubuntu
+scripts/debug/build.sh --agent codex --base ubuntu
 
 # Build the full agent/base matrix (tags derived from config.yaml)
-scripts/util/build-all.sh
+scripts/debug/build-all.sh
 ```
 
 ## Test

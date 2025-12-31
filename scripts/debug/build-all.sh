@@ -10,10 +10,10 @@ die() {
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/util/build-all.sh [build-options]
+Usage: scripts/debug/build-all.sh [build-options]
 
 Builds the full matrix of <agent>-<base> combinations. Any options after the script name are
-forwarded to scripts/util/build.sh for each build.
+forwarded to scripts/debug/build.sh for each build.
 
 Options:
   -h, --help          Show this help and exit
@@ -51,7 +51,7 @@ for agent_dir in "${AGENTS_DIR}"/*; do
   AICAGE_BASE_ALIASES="$(get_bases "${agent}" "${BASES_TMPDIR}/bases" "${AICAGE_BASE_ALIASES:-}")"
   for base_alias in ${AICAGE_BASE_ALIASES}; do
     echo "[build-all] Building ${agent}-${base_alias}" >&2
-    "${ROOT_DIR}/scripts/util/build.sh" \
+    "${ROOT_DIR}/scripts/debug/build.sh" \
       --agent "${agent}" \
       --base "${base_alias}" \
       "${PUSHED_ARGS[@]}"

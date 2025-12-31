@@ -46,7 +46,7 @@ jobs:
 
       - name: "Release: Generate images metadata"
         run: |
-          scripts/util/generate-images-metadata.sh \
+          scripts/generate-images-metadata.sh \
             --config config.yaml \
             --agents-dir agents \
             --output images-metadata.yaml \
