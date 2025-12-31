@@ -15,19 +15,59 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  refresh:
-    name: Refresh agent/base images
+  latest-release-tag:
     runs-on: ubuntu-latest
     env:
+      GIT_REF: ${{ github.ref }}
+    outputs:
+      GIT_REF: ${{ steps.config.outputs.GIT_REF }}
+    steps:
+      - name: "Config: Get tag of latest release"
+        id: config
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            GIT_REF="$(
+              curl \
+                -fsSL \
+                --retry 8 \
+                --retry-all-errors \
+                --retry-delay 2 \
+                --max-time 300 \
+                -H "Accept: application/vnd.github+json" \
+                https://api.github.com/repos/aicage/aicage-image/releases/latest \
+              | jq -r '.tag_name' \
+            )"
+          fi
+          if [[ -z "${GIT_REF}" ]]; then
+            echo "Git tag is empty for latest release" >&2
+            exit 1
+          fi
+          {
+            echo "GIT_REF=${GIT_REF}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Latest release tag: ${GIT_REF}"
+
+
+  refresh:
+    name: Refresh agent/base images for ${{ needs.latest-release-tag.outputs.GIT_REF }}
+    runs-on: ubuntu-latest
+    needs: latest-release-tag
+    env:
       GH_TOKEN: ${{ github.token }}
-      REF: ${{ github.ref }}
+      GIT_REF: ${{ needs.latest-release-tag.outputs.GIT_REF }}
       ROOT_DIR: ${{ github.workspace }}
     steps:
+
       - name: Checkout
         uses: actions/checkout@v6.0.1
+        with:
+          ref: ${{ needs.latest-release-tag.outputs.GIT_REF }}
 
       - name: Install pipeline dependencies
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y jq skopeo
 
@@ -60,7 +100,7 @@ jobs:
             local message="$3"
 
             echo "${message}"
-            gh workflow run build.yml --ref "${REF}" -f agent="${agent}" -f base="${base_alias}"
+            gh workflow run build.yml --ref "${GIT_REF}" -f agent="${agent}" -f base="${base_alias}"
           }
 
           needs_rebuild_status() {
@@ -121,7 +161,7 @@ jobs:
             case "${status}" in
               0)
                 dispatch_build "${agent}" "${base_alias}" \
-                  "Dispatching ${agent} (${base_alias}) for ${REF}"
+                  "Dispatching ${agent} (${base_alias}) for ${GIT_REF}"
                 return 0
                 ;;
               1)
