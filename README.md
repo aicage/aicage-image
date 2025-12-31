@@ -9,17 +9,21 @@ base layers from `ghcr.io/aicage/aicage-image-base`.
 - Bases: aliases such as `ubuntu`, `fedora`, and `act` (discovered from base-layer tags).
 - Multi-arch support: `linux/amd64` and `linux/arm64`.
 
-## Tag format
+## Tag formats
 
-`${AICAGE_IMAGE_REPOSITORY:-ghcr.io/aicage/aicage}:<agent>-<base>-<version>`
+- `${AICAGE_IMAGE_REPOSITORY:-ghcr.io/aicage/aicage}:<agent>-<base>`
+- `${AICAGE_IMAGE_REPOSITORY:-ghcr.io/aicage/aicage}:<agent>-<agent_version>-<base>-<aicage_version>`
 
-- Example: `ghcr.io/aicage/aicage:codex-ubuntu-latest`
-- `<base>-latest` tags map to the latest published base layer with that alias.
+Example:
+- `ghcr.io/aicage/aicage:codex-ubuntu`
+- `ghcr.io/aicage/aicage:codex-0.77.0-ubuntu-0.0.1`
+
+`<agent>-<base>` tags map to the latest published image for an agent and a base.
 
 ## Quick start
 
 ```bash
-docker pull ghcr.io/aicage/aicage:codex-ubuntu-latest
+docker pull ghcr.io/aicage/aicage:codex-ubuntu
 
 docker run -it --rm \
   -e OPENAI_API_KEY=sk-... \
@@ -27,7 +31,7 @@ docker run -it --rm \
   -e AICAGE_GID=$(id -g) \
   -e AICAGE_USER=$(id -un) \
   -v "$(pwd)":/workspace \
-  ghcr.io/aicage/aicage:cline-ubuntu-latest
+  ghcr.io/aicage/aicage:cline-ubuntu
 ```
 
 Swap `codex` for `cline`, and choose any available `<base>` alias.

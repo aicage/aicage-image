@@ -16,7 +16,7 @@ Options:
   -h, --help      Show this help and exit
 
 Examples:
-  scripts/test.sh --image example/aicage:codex-ubuntu-24.04-latest --agent codex
+  scripts/test.sh --image example/aicage:codex-ubuntu --agent codex
 USAGE
   exit 1
 }

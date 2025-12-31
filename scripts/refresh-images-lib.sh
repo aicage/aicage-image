@@ -13,7 +13,7 @@ get_manifest_digest() {
   fi
 
   if ! digest="$(run_cmd "jq digest ${image} ${arch}" \
-    jq -r --arg arch "${arch}" '.manifests[]? | select(.platform.architecture == $arch) | .digest' \
+    jq -r --arg arch "${arch}" ".manifests[]? | select(.platform.architecture == \$arch) | .digest" \
     <<<"${manifest}")"; then
     return 1
   fi
@@ -64,13 +64,15 @@ run_cmd() {
 }
 
 needs_rebuild() {
-  local agent="$1"
-  local base="$2"
-  local version="$3"
+  local base_image_tag="$1"
+  local final_image_tag="$2"
   local base_repo="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}"
   local final_repo="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
-  local base_image="${base_repo}:${base}-latest"
-  local final_image="${final_repo}:${agent}-${base}-${version}"
+  local base_image="${base_repo}:${base_image_tag}"
+  local final_image="${final_repo}:${final_image_tag}"
+
+  echo "[needs-rebuild]: base_image=${base_image}" >&2
+  echo "[needs-rebuild]: final_image=${final_image}" >&2
 
   if ! skopeo inspect "docker://${final_image}" >/dev/null 2>&1; then
     echo "${final_image} is missing"

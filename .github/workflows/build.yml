@@ -41,6 +41,7 @@ jobs:
       BASE_ALIAS: ${{ inputs.base }}
       AGENT: ${{ inputs.agent }}
       ROOT_DIR: ${{ github.workspace }}
+      AICAGE_VERSION: ${{ github.ref }}
     outputs:
       BASE_IMAGE: ${{ steps.config.outputs.BASE_IMAGE }}
       IMAGE_NAME: ${{ steps.config.outputs.IMAGE_NAME }}
@@ -100,15 +101,15 @@ jobs:
           set -euo pipefail
           source scripts/common.sh
           load_config_file
-          BASE_IMAGE="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}-latest"
+          BASE_IMAGE="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}"
           IMAGE_NAME="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
           AGENT_VERSION="$(agents/${AGENT}/version.sh)"
           if [[ -z "${AGENT_VERSION}" ]]; then
             echo "Agent version is empty for ${AGENT}" >&2
             exit 1
           fi
-          MANIFEST_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}-${AGENT_VERSION}"
-          MANIFEST_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}-latest"
+          MANIFEST_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${AGENT_VERSION}-${BASE_ALIAS}-${AICAGE_VERSION}"
+          MANIFEST_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}"
           MANIFEST_TEST_TAG="${MANIFEST_VERSION_TAG}-test"
           BASES_TMPDIR="$(download_bases_archive)"
           ALLOWED_BASES="$(get_bases "${AGENT}" "${BASES_TMPDIR}/bases" "${BASE_ALIAS}")"
@@ -148,6 +149,8 @@ jobs:
       BASE_ALIAS: ${{ inputs.base }}
       BASE_IMAGE: ${{ needs.load_config.outputs.BASE_IMAGE }}
       IMAGE_NAME: ${{ needs.load_config.outputs.IMAGE_NAME }}
+      MANIFEST_VERSION_TAG: ${{ needs.load_config.outputs.MANIFEST_VERSION_TAG }}
+      MANIFEST_LATEST_TAG: ${{ needs.load_config.outputs.MANIFEST_LATEST_TAG }}
       AGENT: ${{ inputs.agent }}
       AGENT_PATH: ${{ needs.load_config.outputs.AGENT_PATH }}
       AGENT_FULL_NAME: ${{ needs.load_config.outputs.AGENT_FULL_NAME }}
@@ -166,8 +169,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}-${ARCH_SUFFIX}-${AGENT_VERSION}"
-          IMAGE_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}-${ARCH_SUFFIX}-latest"
+          IMAGE_VERSION_TAG="${MANIFEST_VERSION_TAG}-${ARCH_SUFFIX}"
+          IMAGE_LATEST_TAG="${MANIFEST_LATEST_TAG}-${ARCH_SUFFIX}"
           IMAGE_TEST_TAG="${IMAGE_VERSION_TAG}-test"
           {
             echo "IMAGE_VERSION_TAG=${IMAGE_VERSION_TAG}"

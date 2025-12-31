@@ -15,12 +15,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+
   latest-release-tag:
     runs-on: ubuntu-latest
     env:
-      GIT_REF: ${{ github.ref }}
+      AICAGE_VERSION: ${{ github.ref }}
     outputs:
-      GIT_REF: ${{ steps.config.outputs.GIT_REF }}
+      AICAGE_VERSION: ${{ steps.config.outputs.AICAGE_VERSION }}
     steps:
       - name: "Config: Get tag of latest release"
         id: config
@@ -28,7 +29,7 @@ jobs:
           set -euo pipefail
 
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            GIT_REF="$(
+            AICAGE_VERSION="$(
               curl \
                 -fsSL \
                 --retry 8 \
@@ -40,30 +41,29 @@ jobs:
               | jq -r '.tag_name' \
             )"
           fi
-          if [[ -z "${GIT_REF}" ]]; then
+          if [[ -z "${AICAGE_VERSION}" ]]; then
             echo "Git tag is empty for latest release" >&2
             exit 1
           fi
           {
-            echo "GIT_REF=${GIT_REF}"
+            echo "AICAGE_VERSION=${AICAGE_VERSION}"
           } >> "$GITHUB_OUTPUT"
-          echo "Latest release tag: ${GIT_REF}"
-
+          echo "Latest release tag: ${AICAGE_VERSION}"
 
   refresh:
-    name: Refresh agent/base images for ${{ needs.latest-release-tag.outputs.GIT_REF }}
+    name: Refresh agent/base images for ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
     runs-on: ubuntu-latest
     needs: latest-release-tag
     env:
       GH_TOKEN: ${{ github.token }}
-      GIT_REF: ${{ needs.latest-release-tag.outputs.GIT_REF }}
+      AICAGE_VERSION: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
       ROOT_DIR: ${{ github.workspace }}
     steps:
 
       - name: Checkout
         uses: actions/checkout@v6.0.1
         with:
-          ref: ${{ needs.latest-release-tag.outputs.GIT_REF }}
+          ref: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
 
       - name: Install pipeline dependencies
         run: |
@@ -100,7 +100,7 @@ jobs:
             local message="$3"
 
             echo "${message}"
-            gh workflow run build.yml --ref "${GIT_REF}" -f agent="${agent}" -f base="${base_alias}"
+            gh workflow run build.yml --ref "${AICAGE_VERSION}" -f agent="${agent}" -f base="${base_alias}"
           }
 
           needs_rebuild_status() {
@@ -110,7 +110,7 @@ jobs:
             local status output
 
             set +e
-            output="$(needs_rebuild "${agent}" "${base_alias}" "${agent_version}" 2>&1)"
+            output="$(needs_rebuild "${base_alias}" "${agent}-${agent_version}-${base_alias}-${AICAGE_VERSION}" 2>&1)"
             status=$?
             set -e
 
@@ -161,7 +161,7 @@ jobs:
             case "${status}" in
               0)
                 dispatch_build "${agent}" "${base_alias}" \
-                  "Dispatching ${agent} (${base_alias}) for ${GIT_REF}"
+                  "Dispatching ${agent} (${base_alias}) for ${AICAGE_VERSION}"
                 return 0
                 ;;
               1)

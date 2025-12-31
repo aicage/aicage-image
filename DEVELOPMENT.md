@@ -54,7 +54,7 @@ scripts/debug/build-all.sh
 
 ```bash
 # Test a specific image
-scripts/test.sh --image ghcr.io/aicage/aicage:codex-ubuntu-latest --agent codex
+scripts/test.sh --image ghcr.io/aicage/aicage:codex-ubuntu --agent codex
 
 # Test the full matrix (tags derived from config.yaml and available base aliases)
 scripts/test-all.sh
