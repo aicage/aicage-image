@@ -69,6 +69,7 @@ fi
 source "${ROOT_DIR}/scripts/common.sh"
 
 load_config_file
+IMAGE_REPOSITORY="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
 
 BASES_TMPDIR="$(download_bases_archive)"
 BASES_DIR="${BASES_TMPDIR}/bases"
@@ -96,7 +97,8 @@ for agent_dir in "${AGENTS_DIR}"/*; do
   mapfile -t valid_bases < <(get_bases "${agent}" "${BASES_DIR}")
   bases_list="$(mktemp)"
   for base_alias in "${valid_bases[@]}"; do
-    printf -- '- %s\n' "${base_alias}" >> "${bases_list}"
+    printf -- '%s: %s:%s-%s\n' "${base_alias}" "${IMAGE_REPOSITORY}" "${agent}" "${base_alias}" \
+      >> "${bases_list}"
   done
 
   agent_tmp="$(mktemp)"
