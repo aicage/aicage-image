@@ -70,9 +70,6 @@ AGENT_VERSION="$("${ROOT_DIR}/agents/${AGENT}/version.sh")"
 [[ -n "${AGENT_VERSION}" ]] || die "Agent version is empty for ${AGENT}"
 VERSION_TAG="${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}-${AGENT_VERSION}"
 LATEST_TAG="${AICAGE_IMAGE_REPOSITORY}:${AGENT}-${BASE_ALIAS}"
-AGENT_PATH="$(get_agent_field "${AGENT}" agent_path)"
-AGENT_FULL_NAME="$(get_agent_field "${AGENT}" agent_full_name)"
-AGENT_HOMEPAGE="$(get_agent_field "${AGENT}" agent_homepage)"
 
 (
   echo "[build] Agent=${AGENT}"
@@ -87,9 +84,6 @@ docker build \
   --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
   --build-arg "AGENT=${AGENT}" \
   --label "org.opencontainers.image.description=Agent image for ${AGENT}" \
-  --label "org.aicage.agent.agent_path=${AGENT_PATH}" \
-  --label "org.aicage.agent.agent_full_name=${AGENT_FULL_NAME}" \
-  --label "org.aicage.agent.agent_homepage=${AGENT_HOMEPAGE}" \
   --tag "${VERSION_TAG}" \
   --tag "${LATEST_TAG}" \
   "${ROOT_DIR}"

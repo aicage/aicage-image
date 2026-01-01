@@ -132,9 +132,6 @@ jobs:
             echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
             echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
             echo "MANIFEST_TEST_TAG=${MANIFEST_TEST_TAG}"
-            echo "AGENT_PATH=$(get_agent_field "${AGENT}" agent_path)"
-            echo "AGENT_FULL_NAME=$(get_agent_field "${AGENT}" agent_full_name)"
-            echo "AGENT_HOMEPAGE=$(get_agent_field "${AGENT}" agent_homepage)"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -215,9 +212,6 @@ jobs:
             ${{ steps.config.outputs.IMAGE_TEST_TAG }}
           labels: |
             org.opencontainers.image.description=Agent image for ${{ env.AGENT }}
-            org.aicage.agent.agent_path=${{ env.AGENT_PATH }}
-            org.aicage.agent.agent_full_name=${{ env.AGENT_FULL_NAME }}
-            org.aicage.agent.agent_homepage=${{ env.AGENT_HOMEPAGE }}
 
       - name: "Test: Setup BATS testing framework"
         uses: mig4/setup-bats@v1.2.0
