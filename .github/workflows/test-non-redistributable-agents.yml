@@ -26,45 +26,9 @@ concurrency:
 
 jobs:
 
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: "Test: Set up Python"
-        uses: actions/setup-python@v6.1.0
-        with:
-          python-version: "3.x"
-
-      - name: "Test: Remove Python yq and keep using Go yq"
-        run: |
-          python -m pip uninstall -y yq
-
-      - name: "Test: Install lint deps"
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: "Test: Run linters (yamllint, ruff, pymarkdown)"
-        run: |
-          yamllint .
-          ruff check .
-          pymarkdown --config .pymarkdown.json scan .
-
-      - name: "Test: Validate config and agents with schemas"
-        run: |
-          check-jsonschema \
-            --schemafile doc/validation/agent.schema.json \
-            agents/*/agent.yaml
-          check-jsonschema \
-            --schemafile doc/validation/config.schema.json \
-            config.yaml
-
   test-non-redistributable:
     name: "${{ matrix.arch }}: Test ${{ matrix.agent }}-${{ matrix.base }}"
     runs-on: ${{ matrix.runner }}
-    needs: lint
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(inputs.matrix_images) }}
