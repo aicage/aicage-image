@@ -2,9 +2,7 @@ name: Test Non-Redistributable Agents
 run-name: Test non-redistributable agents (${{ github.ref_name }})
 
 "on":
-  push:
-    tags:
-      - "*"
+  workflow_call: {}
   workflow_dispatch:
     inputs:
       base:
