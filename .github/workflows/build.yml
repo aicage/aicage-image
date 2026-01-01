@@ -34,24 +34,8 @@ permissions:
 
 jobs:
 
-  load_config:
-    name: Load config file, set variables
+  lint:
     runs-on: ubuntu-latest
-    env:
-      BASE_ALIAS: ${{ inputs.base }}
-      AGENT: ${{ inputs.agent }}
-      ROOT_DIR: ${{ github.workspace }}
-      AICAGE_VERSION: ${{ github.ref_name }}
-    outputs:
-      BASE_IMAGE: ${{ steps.config.outputs.BASE_IMAGE }}
-      IMAGE_NAME: ${{ steps.config.outputs.IMAGE_NAME }}
-      MANIFEST_VERSION_TAG: ${{ steps.config.outputs.MANIFEST_VERSION_TAG }}
-      MANIFEST_LATEST_TAG: ${{ steps.config.outputs.MANIFEST_LATEST_TAG }}
-      MANIFEST_TEST_TAG: ${{ steps.config.outputs.MANIFEST_TEST_TAG }}
-      AGENT_PATH: ${{ steps.config.outputs.AGENT_PATH }}
-      AGENT_FULL_NAME: ${{ steps.config.outputs.AGENT_FULL_NAME }}
-      AGENT_HOMEPAGE: ${{ steps.config.outputs.AGENT_HOMEPAGE }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -85,8 +69,30 @@ jobs:
             --schemafile doc/validation/config.schema.json \
             config.yaml
 
+  load_config:
+    name: Load config file, set variables
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      BASE_ALIAS: ${{ inputs.base }}
+      AGENT: ${{ inputs.agent }}
+      ROOT_DIR: ${{ github.workspace }}
+      AICAGE_VERSION: ${{ github.ref_name }}
+    outputs:
+      BASE_IMAGE: ${{ steps.config.outputs.BASE_IMAGE }}
+      IMAGE_NAME: ${{ steps.config.outputs.IMAGE_NAME }}
+      MANIFEST_VERSION_TAG: ${{ steps.config.outputs.MANIFEST_VERSION_TAG }}
+      MANIFEST_LATEST_TAG: ${{ steps.config.outputs.MANIFEST_LATEST_TAG }}
+      MANIFEST_TEST_TAG: ${{ steps.config.outputs.MANIFEST_TEST_TAG }}
+      AGENT_PATH: ${{ steps.config.outputs.AGENT_PATH }}
+      AGENT_FULL_NAME: ${{ steps.config.outputs.AGENT_FULL_NAME }}
+      AGENT_HOMEPAGE: ${{ steps.config.outputs.AGENT_HOMEPAGE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: "Test: Validate agent"
-        shell: bash
         run: |
           set -euo pipefail
           if [[ ! -d "agents/${AGENT}" ]]; then
@@ -167,7 +173,6 @@ jobs:
 
       - name: Set config
         id: config
-        shell: bash
         run: |
           set -euo pipefail
           IMAGE_VERSION_TAG="${MANIFEST_VERSION_TAG}-${ARCH_SUFFIX}"
