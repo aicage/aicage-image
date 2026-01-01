@@ -44,9 +44,17 @@ get_agent_field() {
   [[ -f "${definition_file}" ]] || _die "Missing agent.yaml for '${agent}'"
 
   local value
-  value="$(yq -er ".${field}" "${definition_file}")" || _die "Failed to read ${field} from ${definition_file}"
+  value="$(yq -r ".${field}" "${definition_file}")" || _die "Failed to read ${field} from ${definition_file}"
   [[ -n "${value}" && "${value}" != "null" ]] || _die "${field} missing in ${definition_file}"
   printf '%s\n' "${value}"
+}
+
+is_agent_field_true() {
+  local agent="$1"
+  local field="$2"
+  local value
+  value="$(get_agent_field "${agent}" "${field}")"
+  [[ "${value}" == "true" ]]
 }
 
 get_agent_list_field() {

@@ -181,6 +181,10 @@ jobs:
           for dir in agents/*; do
             [ -d "${dir}" ] || continue
             AGENT="$(basename "${dir}")"
+            if ! is_agent_field_true "${AGENT}" redistributable; then
+              echo "Skipping non-redistributable agent ${AGENT}"
+              continue
+            fi
             AGENT_VERSION="$(agents/${AGENT}/version.sh)"
             if [[ -z "${AGENT_VERSION}" ]]; then
               echo "Agent version is empty for ${AGENT}" >&2
