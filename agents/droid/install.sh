@@ -18,13 +18,3 @@ if ! command -v droid >/dev/null 2>&1; then
   echo "[install_droid] 'droid' executable not found after installation." >&2
   exit 1
 fi
-
-install -d /usr/share/licenses/droid
-curl -fsSL https://app.factory.ai/terms \
-  -o /usr/share/licenses/droid/TERMS.html
-
-install -d /usr/share/licenses/ripgrep
-curl -fsSL https://raw.githubusercontent.com/BurntSushi/ripgrep/master/LICENSE-MIT \
-  -o /usr/share/licenses/ripgrep/LICENSE-MIT
-curl -fsSL https://raw.githubusercontent.com/BurntSushi/ripgrep/master/LICENSE-UNLICENSE \
-  -o /usr/share/licenses/ripgrep/LICENSE-UNLICENSE
