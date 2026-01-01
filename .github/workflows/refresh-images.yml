@@ -88,6 +88,8 @@ jobs:
 
           BASES_TMPDIR="$(download_bases_archive)"
           LOG_DIR="$(mktemp -d)"
+          BUILD_LIST="$(mktemp)"
+          BUILD_LIST_LOCK="$(mktemp)"
           error_count=0
           pids=()
           declare -A pid_to_log pid_to_label
@@ -96,13 +98,16 @@ jobs:
             printf '%s' "$1" | tr -c '[:alnum:]_.-' '_'
           }
 
-          dispatch_build() {
+          append_build() {
             local agent="$1"
             local base_alias="$2"
-            local message="$3"
 
-            echo "${message}"
-            gh workflow run build.yml --ref "${AICAGE_VERSION}" -f agent="${agent}" -f base="${base_alias}"
+            flock "${BUILD_LIST_LOCK}" \
+              bash -c 'printf "%s\t%s\n" "$1" "$2" >> "$3"' \
+              _ \
+              "${agent}" \
+              "${base_alias}" \
+              "${BUILD_LIST}"
           }
 
           needs_rebuild_status() {
@@ -153,8 +158,8 @@ jobs:
             local agent_version="$3"
 
             if [[ "${FORCE_BUILD}" == "true" ]]; then
-              dispatch_build "${agent}" "${base_alias}" \
-                "Forcing build for ${agent} (${base_alias}) due to ${GITHUB_EVENT_NAME}"
+              echo "Forcing build for ${agent} (${base_alias}) due to ${GITHUB_EVENT_NAME}"
+              append_build "${agent}" "${base_alias}"
               return 0
             fi
 
@@ -162,8 +167,8 @@ jobs:
             status="$(needs_rebuild_status "${agent}" "${base_alias}" "${agent_version}")"
             case "${status}" in
               0)
-                dispatch_build "${agent}" "${base_alias}" \
-                  "Dispatching ${agent} (${base_alias}) for ${AICAGE_VERSION}"
+                echo "Needs build ${agent} (${base_alias}) for ${AICAGE_VERSION}"
+                append_build "${agent}" "${base_alias}"
                 return 0
                 ;;
               1)
@@ -218,3 +223,58 @@ jobs:
             echo "Refresh checks reported ${error_count} error(s)." >&2
             exit 1
           fi
+
+          build_matrix_file="$(mktemp)"
+          combos_file="$(mktemp)"
+          echo '{"include":[]}' > "${build_matrix_file}"
+          echo '{"include":[]}' > "${combos_file}"
+          while IFS=$'\t' read -r agent base_alias; do
+            [[ -n "${agent}" ]] || continue
+            jq -c \
+              --arg agent "${agent}" \
+              --arg base "${base_alias}" \
+              '
+                .include += [
+                  {
+                    "agent": $agent,
+                    "base": $base,
+                    "arch": "amd64",
+                    "platform": "linux/amd64",
+                    "runner": "ubuntu-latest"
+                  },
+                  {
+                    "agent": $agent,
+                    "base": $base,
+                    "arch": "arm64",
+                    "platform": "linux/arm64",
+                    "runner": "ubuntu-24.04-arm"
+                  }
+                ]
+              ' \
+              "${build_matrix_file}" > "${build_matrix_file}.tmp"
+            mv "${build_matrix_file}.tmp" "${build_matrix_file}"
+            jq -c \
+              --arg agent "${agent}" \
+              --arg base "${base_alias}" \
+              '.include += [{"agent": $agent, "base": $base}]' \
+              "${combos_file}" > "${combos_file}.tmp"
+            mv "${combos_file}.tmp" "${combos_file}"
+          done < "${BUILD_LIST}"
+
+          build_count="$(jq -r '.include | length' "${build_matrix_file}")"
+          if [[ "${build_count}" -eq 0 ]]; then
+            echo "No image rebuilds required."
+            exit 0
+          fi
+
+          build_matrix_json="$(cat "${build_matrix_file}")"
+          combos_json="$(cat "${combos_file}")"
+          echo "Build matrix:"
+          jq '.' "${build_matrix_file}"
+          echo "Manifest matrix:"
+          jq '.' "${combos_file}"
+          echo "Dispatching build.yml for ${build_count} combo(s)."
+          gh workflow run build.yml \
+            --ref "${AICAGE_VERSION}" \
+            -f matrix_images="${build_matrix_json}" \
+            -f matrix_manifests="${combos_json}"

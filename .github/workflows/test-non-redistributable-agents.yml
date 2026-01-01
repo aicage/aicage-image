@@ -63,7 +63,6 @@ jobs:
     needs: lint
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-      has_entries: ${{ steps.set-matrix.outputs.has_entries }}
     env:
       ROOT_DIR: ${{ github.workspace }}
     steps:
@@ -137,28 +136,17 @@ jobs:
               ' \
               "${matrix_file}" > "${filtered_file}"
             mv "${filtered_file}" "${matrix_file}"
-            count="$(jq -r '.include | length' "${matrix_file}")"
-            if [[ "${count}" -eq 0 ]]; then
-              echo "No matching agent/base combinations for inputs." >&2
-              exit 1
-            fi
           fi
 
           matrix_json="$(cat "${matrix_file}")"
-          {
-            echo "matrix=${matrix_json}"
-            if [[ "${count}" -gt 0 ]]; then
-              echo "has_entries=true"
-            else
-              echo "has_entries=false"
-            fi
-          } >> "$GITHUB_OUTPUT"
+          echo "Test matrix:"
+          jq '.' "${matrix_file}"
+          echo "matrix=${matrix_json}" >> "$GITHUB_OUTPUT"
 
   test-non-redistributable:
     name: "${{ matrix.arch }}: Test ${{ matrix.agent }}-${{ matrix.base }}"
     runs-on: ${{ matrix.runner }}
     needs: [matrix]
-    if: ${{ needs.matrix.outputs.has_entries == 'true' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}

@@ -1,30 +1,36 @@
-name: Build Agent Image (Template)
-run-name: Build ${{ inputs.agent }}-${{ inputs.base }}
+name: Build Agent Images
+run-name: Build agent images (${{ github.ref_name }})
 
 "on":
   workflow_call:
     inputs:
-      base:
-        description: Base alias to build (from bases.tar.gz release artifact)
+      matrix_images:
+        description: JSON image matrix with include entries ({agent, base, arch, platform, runner})
         required: true
         type: string
-      agent:
-        description: Agent name to build (matches agents/<agent>)
+      matrix_manifests:
+        description: JSON manifest matrix with include entries ({agent, base})
         required: true
         type: string
   workflow_dispatch:
     inputs:
-      base:
-        description: Base alias to build (from bases.tar.gz release artifact)
+      matrix_images:
+        description: JSON image matrix with include entries ({agent, base, arch, platform, runner})
         required: true
+        default: >-
+          {"include":[{"agent":"bar","base":"foo","arch":"amd64",
+          "platform":"linux/amd64","runner":"ubuntu-latest"},{"agent":"bar",
+          "base":"foo","arch":"arm64","platform":"linux/arm64",
+          "runner":"ubuntu-24.04-arm"}]}
         type: string
-      agent:
-        description: Agent name to build (matches agents/<agent>)
+      matrix_manifests:
+        description: JSON manifest matrix with include entries ({agent, base})
         required: true
+        default: '{"include":[{"agent":"bar","base":"foo"}]}'
         type: string
 
 concurrency:
-  group: build-${{ inputs.base }}-${{ inputs.agent }}
+  group: build-${{ github.run_id }}
   cancel-in-progress: false
 
 permissions:
@@ -69,36 +75,24 @@ jobs:
             --schemafile doc/validation/config.schema.json \
             config.yaml
 
-  load_config:
-    name: Load config file, set variables
-    runs-on: ubuntu-latest
+  build:
+    name: "${{ matrix.arch }}: Build, test, and publish ${{ matrix.base }}-${{ matrix.agent }}"
+    runs-on: ${{ matrix.runner }}
     needs: lint
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.matrix_images) }}
     env:
-      BASE_ALIAS: ${{ inputs.base }}
-      AGENT: ${{ inputs.agent }}
+      PLATFORM: ${{ matrix.platform }}
+      ARCH_SUFFIX: ${{ matrix.arch }}
+      BASE_ALIAS: ${{ matrix.base }}
+      AGENT: ${{ matrix.agent }}
       ROOT_DIR: ${{ github.workspace }}
       AICAGE_VERSION: ${{ github.ref_name }}
-    outputs:
-      BASE_IMAGE: ${{ steps.config.outputs.BASE_IMAGE }}
-      IMAGE_NAME: ${{ steps.config.outputs.IMAGE_NAME }}
-      MANIFEST_VERSION_TAG: ${{ steps.config.outputs.MANIFEST_VERSION_TAG }}
-      MANIFEST_LATEST_TAG: ${{ steps.config.outputs.MANIFEST_LATEST_TAG }}
-      MANIFEST_TEST_TAG: ${{ steps.config.outputs.MANIFEST_TEST_TAG }}
-      AGENT_PATH: ${{ steps.config.outputs.AGENT_PATH }}
-      AGENT_FULL_NAME: ${{ steps.config.outputs.AGENT_FULL_NAME }}
-      AGENT_HOMEPAGE: ${{ steps.config.outputs.AGENT_HOMEPAGE }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: "Test: Validate agent"
-        run: |
-          set -euo pipefail
-          if [[ ! -d "agents/${AGENT}" ]]; then
-            echo "Agent '${AGENT}' not found under agents/" >&2
-            exit 1
-          fi
+        uses: actions/checkout@v6.0.1
 
       - name: Load config file
         id: config
@@ -119,7 +113,10 @@ jobs:
           IMAGE_NAME="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
           MANIFEST_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${AGENT_VERSION}-${BASE_ALIAS}-${AICAGE_VERSION}"
           MANIFEST_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}"
-          MANIFEST_TEST_TAG="${MANIFEST_VERSION_TAG}-test"
+          IMAGE_VERSION_TAG="${MANIFEST_VERSION_TAG}-${ARCH_SUFFIX}"
+          IMAGE_LATEST_TAG="${MANIFEST_LATEST_TAG}-${ARCH_SUFFIX}"
+          IMAGE_TEST_TAG="${IMAGE_VERSION_TAG}-test"
+
           BASES_TMPDIR="$(download_bases_archive)"
           ALLOWED_BASES="$(get_bases "${AGENT}" "${BASES_TMPDIR}/bases" "${BASE_ALIAS}")"
           if ! printf '%s\n' "${ALLOWED_BASES}" | grep -Fxq "${BASE_ALIAS}"; then
@@ -131,56 +128,15 @@ jobs:
             echo "IMAGE_NAME=${IMAGE_NAME}"
             echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
             echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
-            echo "MANIFEST_TEST_TAG=${MANIFEST_TEST_TAG}"
-          } >> "$GITHUB_OUTPUT"
-
-  build:
-    name: "${{ matrix.arch }}: Build, test, and publish ${{ inputs.base }}-${{ inputs.agent }}"
-    runs-on: ${{ matrix.runner }}
-    needs: load_config
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            platform: linux/amd64
-            runner: ubuntu-latest
-          - arch: arm64
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-    env:
-      PLATFORM: ${{ matrix.platform }}
-      ARCH_SUFFIX: ${{ matrix.arch }}
-      BASE_ALIAS: ${{ inputs.base }}
-      BASE_IMAGE: ${{ needs.load_config.outputs.BASE_IMAGE }}
-      IMAGE_NAME: ${{ needs.load_config.outputs.IMAGE_NAME }}
-      MANIFEST_VERSION_TAG: ${{ needs.load_config.outputs.MANIFEST_VERSION_TAG }}
-      MANIFEST_LATEST_TAG: ${{ needs.load_config.outputs.MANIFEST_LATEST_TAG }}
-      AGENT: ${{ inputs.agent }}
-      AGENT_PATH: ${{ needs.load_config.outputs.AGENT_PATH }}
-      AGENT_FULL_NAME: ${{ needs.load_config.outputs.AGENT_FULL_NAME }}
-      AGENT_HOMEPAGE: ${{ needs.load_config.outputs.AGENT_HOMEPAGE }}
-    outputs:
-      AICAGE_IMAGE_DIGEST_amd64: ${{ steps.out.outputs.AICAGE_IMAGE_DIGEST_amd64 }}
-      AICAGE_IMAGE_DIGEST_arm64: ${{ steps.out.outputs.AICAGE_IMAGE_DIGEST_arm64 }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6.0.1
-
-      - name: Set config
-        id: config
-        run: |
-          set -euo pipefail
-          IMAGE_VERSION_TAG="${MANIFEST_VERSION_TAG}-${ARCH_SUFFIX}"
-          IMAGE_LATEST_TAG="${MANIFEST_LATEST_TAG}-${ARCH_SUFFIX}"
-          IMAGE_TEST_TAG="${IMAGE_VERSION_TAG}-test"
-          {
             echo "IMAGE_VERSION_TAG=${IMAGE_VERSION_TAG}"
             echo "IMAGE_LATEST_TAG=${IMAGE_LATEST_TAG}"
             echo "IMAGE_TEST_TAG=${IMAGE_TEST_TAG}"
           } >> "$GITHUB_OUTPUT"
           {
+            echo "BASE_IMAGE=${BASE_IMAGE}"
+            echo "IMAGE_NAME=${IMAGE_NAME}"
+            echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
+            echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
             echo "IMAGE_VERSION_TAG=${IMAGE_VERSION_TAG}"
             echo "IMAGE_LATEST_TAG=${IMAGE_LATEST_TAG}"
             echo "IMAGE_TEST_TAG=${IMAGE_TEST_TAG}"
@@ -258,27 +214,85 @@ jobs:
           set -euo pipefail
           oras manifest delete "${IMAGE_TEST_TAG}"
 
-      - id: out
-        name: Output variables
+      - name: Save image digest
         run: |
           set -euo pipefail
-          echo "AICAGE_IMAGE_DIGEST_${{ matrix.arch }}=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
-          echo "AICAGE_IMAGE_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${{ steps.build_image.outputs.digest }}" > digest.txt
+
+      - name: Upload image digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.agent }}-${{ matrix.base }}-${{ matrix.arch }}
+          path: digest.txt
+          retention-days: 1
 
   manifest:
-    name: Publish multi-arch manifest ${{ inputs.base }}-${{ inputs.agent }}
+    name: Publish multi-arch manifest ${{ matrix.base }}-${{ matrix.agent }}
     runs-on: ubuntu-latest
-    needs: [load_config, build]
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.matrix_manifests) }}
     env:
-      MANIFEST_VERSION_TAG: ${{ needs.load_config.outputs.MANIFEST_VERSION_TAG }}
-      MANIFEST_LATEST_TAG: ${{ needs.load_config.outputs.MANIFEST_LATEST_TAG }}
-      MANIFEST_TEST_TAG: ${{ needs.load_config.outputs.MANIFEST_TEST_TAG }}
-      AICAGE_IMAGE_DIGEST_amd64: ${{ needs.build.outputs.AICAGE_IMAGE_DIGEST_amd64 }}
-      AICAGE_IMAGE_DIGEST_arm64: ${{ needs.build.outputs.AICAGE_IMAGE_DIGEST_arm64 }}
+      BASE_ALIAS: ${{ matrix.base }}
+      AGENT: ${{ matrix.agent }}
+      ROOT_DIR: ${{ github.workspace }}
+      AICAGE_VERSION: ${{ github.ref_name }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.1
+
+      - name: Load config file
+        id: config
+        run: |
+          set -euo pipefail
+          source scripts/common.sh
+          load_config_file
+          AGENT_VERSION="$(agents/${AGENT}/version.sh)"
+          if [[ -z "${AGENT_VERSION}" ]]; then
+            echo "Agent version is empty for ${AGENT}" >&2
+            exit 1
+          fi
+          IMAGE_NAME="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
+          MANIFEST_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${AGENT_VERSION}-${BASE_ALIAS}-${AICAGE_VERSION}"
+          MANIFEST_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}"
+          MANIFEST_TEST_TAG="${MANIFEST_VERSION_TAG}-test"
+          {
+            echo "IMAGE_NAME=${IMAGE_NAME}"
+            echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
+            echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
+            echo "MANIFEST_TEST_TAG=${MANIFEST_TEST_TAG}"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "IMAGE_NAME=${IMAGE_NAME}"
+            echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
+            echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
+            echo "MANIFEST_TEST_TAG=${MANIFEST_TEST_TAG}"
+          } >> "$GITHUB_ENV"
+
+      - name: Download amd64 digest
+        uses: actions/download-artifact@v4
+        with:
+          name: digest-${{ matrix.agent }}-${{ matrix.base }}-amd64
+          path: digest/amd64
+
+      - name: Download arm64 digest
+        uses: actions/download-artifact@v4
+        with:
+          name: digest-${{ matrix.agent }}-${{ matrix.base }}-arm64
+          path: digest/arm64
+
+      - name: Load digests
+        id: digests
+        run: |
+          set -euo pipefail
+          DIGEST_AMD64="$(cat digest/amd64/digest.txt)"
+          DIGEST_ARM64="$(cat digest/arm64/digest.txt)"
+          {
+            echo "AICAGE_IMAGE_DIGEST_amd64=${DIGEST_AMD64}"
+            echo "AICAGE_IMAGE_DIGEST_arm64=${DIGEST_ARM64}"
+          } >> "$GITHUB_ENV"
 
       - name: "Set up Buildx"
         uses: docker/setup-buildx-action@v3.11.1
