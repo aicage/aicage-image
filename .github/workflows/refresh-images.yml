@@ -2,9 +2,11 @@ name: Refresh Agent Images (Agent Versions)
 run-name: Refresh agent-version images (${{ github.ref_name }})
 
 "on":
-  push:
-    tags:
-      - "*"
+  workflow_run:
+    workflows:
+      - Release
+    types:
+      - completed
   # The scheduler on GitHub is not reliable enough so a cron job at cron-job.org triggers this by workflow_dispatch
   #   schedule:
   #     - cron: "7,27,47 * * * *"
@@ -28,19 +30,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            AICAGE_VERSION="$(
-              curl \
-                -fsSL \
-                --retry 8 \
-                --retry-all-errors \
-                --retry-delay 2 \
-                --max-time 300 \
-                -H "Accept: application/vnd.github+json" \
-                https://api.github.com/repos/aicage/aicage-image/releases/latest \
-              | jq -r '.tag_name' \
-            )"
-          fi
+          AICAGE_VERSION="$(
+            curl \
+              -fsSL \
+              --retry 8 \
+              --retry-all-errors \
+              --retry-delay 2 \
+              --max-time 300 \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/aicage/aicage-image/releases/latest \
+            | jq -r '.tag_name' \
+          )"
           if [[ -z "${AICAGE_VERSION}" ]]; then
             echo "Git tag is empty for latest release" >&2
             exit 1
