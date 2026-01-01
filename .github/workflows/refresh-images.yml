@@ -20,6 +20,7 @@ jobs:
 
   latest-release-tag:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     env:
       AICAGE_VERSION: ${{ github.ref }}
     outputs:
@@ -54,6 +55,7 @@ jobs:
     name: Refresh agent/base images for ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
     runs-on: ubuntu-latest
     needs: latest-release-tag
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     env:
       GH_TOKEN: ${{ github.token }}
       AICAGE_VERSION: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
