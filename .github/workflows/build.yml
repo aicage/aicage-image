@@ -4,6 +4,11 @@ run-name: Build agent images (${{ github.ref_name }})
 "on":
   workflow_call:
     inputs:
+      git_ref:
+        description: Git ref to check out (tag/branch/SHA). Defaults to the workflow ref.
+        required: false
+        default: ""
+        type: string
       matrix_images:
         description: JSON image matrix with include entries ({agent, base, arch, platform, runner})
         required: true
@@ -52,11 +57,13 @@ jobs:
       BASE_ALIAS: ${{ matrix.base }}
       AGENT: ${{ matrix.agent }}
       ROOT_DIR: ${{ github.workspace }}
-      AICAGE_VERSION: ${{ github.ref_name }}
+      AICAGE_VERSION: ${{ inputs.git_ref || github.ref_name }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.1
+        with:
+          ref: ${{ inputs.git_ref || github.ref }}
 
       - name: Load config file
         id: config
@@ -201,11 +208,13 @@ jobs:
       BASE_ALIAS: ${{ matrix.base }}
       AGENT: ${{ matrix.agent }}
       ROOT_DIR: ${{ github.workspace }}
-      AICAGE_VERSION: ${{ github.ref_name }}
+      AICAGE_VERSION: ${{ inputs.git_ref || github.ref_name }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.1
+        with:
+          ref: ${{ inputs.git_ref || github.ref }}
 
       - name: Load config file
         id: config
