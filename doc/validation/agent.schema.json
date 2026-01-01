@@ -5,7 +5,8 @@
   "required": [
     "agent_path",
     "agent_full_name",
-    "agent_homepage"
+    "agent_homepage",
+    "redistributable"
   ],
   "properties": {
     "agent_path": {
@@ -16,6 +17,9 @@
     },
     "agent_homepage": {
       "type": "string"
+    },
+    "redistributable": {
+      "type": "boolean"
     },
     "base_exclude": {
       "type": "array",
