@@ -8,9 +8,6 @@ run-name: Release (${{ github.ref_name }})
 
 jobs:
 
-  test-non-redistributable:
-    uses: ./.github/workflows/test-non-redistributable-agents.yml
-
   matrix:
     name: Build matrix
     runs-on: ubuntu-latest
@@ -19,6 +16,7 @@ jobs:
     outputs:
       MATRIX_IMAGES: ${{ steps.set-matrix.outputs.MATRIX_IMAGES }}
       MATRIX_MANIFESTS: ${{ steps.set-matrix.outputs.MATRIX_MANIFESTS }}
+      MATRIX_NR_IMAGES: ${{ steps.set-matrix.outputs.MATRIX_NR_IMAGES }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -27,26 +25,27 @@ jobs:
         id: set-matrix
         run: |
           set -euo pipefail
+          # Build the full image matrix once, then split into redistributable
+          # (images + manifests) and non-redistributable (test-only) subsets.
           source scripts/common.sh
           load_config_file
 
           bases_tmpdir="$(download_bases_archive)"
-          images_file="$(mktemp)"
-          manifests_file="$(mktemp)"
-          echo '{"include":[]}' > "${images_file}"
-          echo '{"include":[]}' > "${manifests_file}"
+          # Full matrix includes both archs and a redistributable flag for filtering.
+          full_images_file="$(mktemp)"
+          echo '{"include":[]}' > "${full_images_file}"
 
           for dir in agents/*; do
             [[ -d "${dir}" ]] || continue
             agent="$(basename "${dir}")"
-            if ! is_agent_field_true "${agent}" redistributable; then
-              continue
-            fi
+            redistributable="$(get_agent_field "${agent}" redistributable)"
             base_aliases="$(get_bases "${agent}" "${bases_tmpdir}/bases")"
             for base_alias in ${base_aliases}; do
+              # Append both arch variants with redistributable flag preserved.
               jq -c \
                 --arg agent "${agent}" \
                 --arg base "${base_alias}" \
+                --argjson redistributable "${redistributable}" \
                 '
                   .include += [
                     {
@@ -54,40 +53,75 @@ jobs:
                       "base": $base,
                       "arch": "amd64",
                       "platform": "linux/amd64",
-                      "runner": "ubuntu-latest"
+                      "runner": "ubuntu-latest",
+                      "redistributable": $redistributable
                     },
                     {
                       "agent": $agent,
                       "base": $base,
                       "arch": "arm64",
                       "platform": "linux/arm64",
-                      "runner": "ubuntu-24.04-arm"
+                      "runner": "ubuntu-24.04-arm",
+                      "redistributable": $redistributable
                     }
                   ]
                 ' \
-                "${images_file}" > "${images_file}.tmp"
-              mv "${images_file}.tmp" "${images_file}"
-
-              jq -c \
-                --arg agent "${agent}" \
-                --arg base "${base_alias}" \
-                '.include += [{"agent": $agent, "base": $base}]' \
-                "${manifests_file}" > "${manifests_file}.tmp"
-              mv "${manifests_file}.tmp" "${manifests_file}"
+                "${full_images_file}" > "${full_images_file}.tmp"
+              mv "${full_images_file}.tmp" "${full_images_file}"
             done
           done
 
-          echo "Image matrix:"
-          jq '.' "${images_file}"
-          echo "Manifest matrix:"
-          jq '.' "${manifests_file}"
+          # Split full matrix into: redistributable images, redistributable manifests,
+          # and non-redistributable images for testing.
+          images_file="$(mktemp)"
+          manifests_file="$(mktemp)"
+          nr_images_file="$(mktemp)"
+
+          jq -c \
+            '{include: [.include[] | select(.redistributable == true) | del(.redistributable)]}' \
+            "${full_images_file}" > "${images_file}"
+          jq -c \
+            '{include: ([.include[] | select(.redistributable == true) | {agent, base}] | unique)}' \
+            "${full_images_file}" > "${manifests_file}"
+          jq -c \
+            '{include: [.include[] | select(.redistributable == false) | del(.redistributable)]}' \
+            "${full_images_file}" > "${nr_images_file}"
 
           images_json="$(cat "${images_file}")"
           manifests_json="$(cat "${manifests_file}")"
+          nr_images_json="$(cat "${nr_images_file}")"
           {
             echo "MATRIX_IMAGES=${images_json}"
             echo "MATRIX_MANIFESTS=${manifests_json}"
+            echo "MATRIX_NR_IMAGES=${nr_images_json}"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Print image matrix
+        env:
+          MATRIX_IMAGES: ${{ steps.set-matrix.outputs.MATRIX_IMAGES }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${MATRIX_IMAGES}" | jq '.'
+
+      - name: Print manifest matrix
+        env:
+          MATRIX_MANIFESTS: ${{ steps.set-matrix.outputs.MATRIX_MANIFESTS }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${MATRIX_MANIFESTS}" | jq '.'
+
+      - name: Print non-redistributable matrix
+        env:
+          MATRIX_NR_IMAGES: ${{ steps.set-matrix.outputs.MATRIX_NR_IMAGES }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${MATRIX_NR_IMAGES}" | jq '.'
+
+  test-non-redistributable:
+    needs: matrix
+    uses: ./.github/workflows/test-non-redistributable-agents.yml
+    with:
+      matrix_images: ${{ needs.matrix.outputs.MATRIX_NR_IMAGES }}
 
   build-images:
     needs: matrix

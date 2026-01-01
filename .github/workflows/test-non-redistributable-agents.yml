@@ -2,16 +2,22 @@ name: Test Non-Redistributable Agents
 run-name: Test non-redistributable agents (${{ github.ref_name }})
 
 "on":
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      matrix_images:
+        description: JSON image matrix with include entries ({agent, base, arch, platform, runner})
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
-      base:
-        description: Base alias to test (from bases.tar.gz release artifact)
-        required: false
-        type: string
-      agent:
-        description: Agent name to test (matches agents/<agent>)
-        required: false
+      matrix_images:
+        description: JSON image matrix with include entries ({agent, base, arch, platform, runner})
+        required: true
+        default: >-
+          {"include":[{"agent":"bar","base":"foo","arch":"amd64",
+          "platform":"linux/amd64","runner":"ubuntu-latest"},{"agent":"bar",
+          "base":"foo","arch":"arm64","platform":"linux/arm64",
+          "runner":"ubuntu-24.04-arm"}]}
         type: string
 
 concurrency:
@@ -55,99 +61,13 @@ jobs:
             --schemafile doc/validation/config.schema.json \
             config.yaml
 
-  matrix:
-    name: Generate matrix for non-redistributable agents
-    runs-on: ubuntu-latest
-    needs: lint
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    env:
-      ROOT_DIR: ${{ github.workspace }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Generate matrix
-        id: set-matrix
-        env:
-          REQUESTED_BASE: ${{ github.event.inputs.base }}
-          REQUESTED_AGENT: ${{ github.event.inputs.agent }}
-        run: |
-          set -euo pipefail
-          source scripts/common.sh
-          load_config_file
-          BASES_TMPDIR="$(download_bases_archive)"
-          matrix_file="$(mktemp)"
-          echo '{"include":[]}' > "${matrix_file}"
-          count=0
-
-          append_item() {
-            local agent="$1"
-            local base="$2"
-            local arch="$3"
-            local runner="$4"
-            local platform="$5"
-
-            jq -c \
-              --arg agent "${agent}" \
-              --arg base "${base}" \
-              --arg arch "${arch}" \
-              --arg runner "${runner}" \
-              --arg platform "${platform}" \
-              '
-                .include += [{
-                  "agent": $agent,
-                  "base": $base,
-                  "arch": $arch,
-                  "runner": $runner,
-                  "platform": $platform
-                }]
-              ' \
-              "${matrix_file}" > "${matrix_file}.tmp"
-            mv "${matrix_file}.tmp" "${matrix_file}"
-          }
-
-          for dir in agents/*; do
-            [[ -d "${dir}" ]] || continue
-            agent="$(basename "${dir}")"
-            if is_agent_field_true "${agent}" redistributable; then
-              continue
-            fi
-            bases="$(get_bases "${agent}" "${BASES_TMPDIR}/bases")"
-            for base in ${bases}; do
-              append_item "${agent}" "${base}" "amd64" "ubuntu-latest" "linux/amd64"
-              append_item "${agent}" "${base}" "arm64" "ubuntu-24.04-arm" "linux/arm64"
-              count=$((count + 2))
-            done
-          done
-
-          if [[ -n "${REQUESTED_BASE}" || -n "${REQUESTED_AGENT}" ]]; then
-            filtered_file="$(mktemp)"
-            jq -c \
-              --arg base "${REQUESTED_BASE}" \
-              --arg agent "${REQUESTED_AGENT}" \
-              '
-                .include |= map(select(
-                  ($agent == "" or .agent == $agent)
-                  and ($base == "" or .base == $base)
-                ))
-              ' \
-              "${matrix_file}" > "${filtered_file}"
-            mv "${filtered_file}" "${matrix_file}"
-          fi
-
-          matrix_json="$(cat "${matrix_file}")"
-          echo "Test matrix:"
-          jq '.' "${matrix_file}"
-          echo "matrix=${matrix_json}" >> "$GITHUB_OUTPUT"
-
   test-non-redistributable:
     name: "${{ matrix.arch }}: Test ${{ matrix.agent }}-${{ matrix.base }}"
     runs-on: ${{ matrix.runner }}
-    needs: [matrix]
+    needs: lint
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(inputs.matrix_images) }}
     env:
       PLATFORM: ${{ matrix.platform }}
       ARCH: ${{ matrix.arch }}
