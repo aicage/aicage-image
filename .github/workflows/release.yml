@@ -166,7 +166,7 @@ jobs:
       matrix_images: ${{ needs.matrix.outputs.MATRIX_NR_IMAGES }}
 
   build-images:
-    needs: matrix
+    needs: [matrix, test-non-redistributable]
     uses: ./.github/workflows/build.yml
     with:
       matrix_images: ${{ needs.matrix.outputs.MATRIX_IMAGES }}
