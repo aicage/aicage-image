@@ -95,10 +95,10 @@ for agent_dir in "${AGENTS_DIR}"/*; do
   agent_yaml="${agent_dir}/agent.yaml"
   [[ -f "${agent_yaml}" ]] || continue
 
-  if is_agent_field_true "${agent}" redistributable; then
-    agent_repository="${IMAGE_REPOSITORY}"
-  else
+  if is_agent_field_true "${agent}" build_local; then
     agent_repository="${LOCAL_IMAGE_REPOSITORY}"
+  else
+    agent_repository="${IMAGE_REPOSITORY}"
   fi
 
   mapfile -t valid_bases < <(get_bases "${agent}" "${BASES_DIR}")

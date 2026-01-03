@@ -185,7 +185,7 @@ jobs:
           for dir in agents/*; do
             [ -d "${dir}" ] || continue
             AGENT="$(basename "${dir}")"
-            if ! is_agent_field_true "${AGENT}" redistributable; then
+            if is_agent_field_true "${AGENT}" build_local; then
               echo "Skipping non-redistributable agent ${AGENT}"
               continue
             fi

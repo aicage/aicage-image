@@ -67,27 +67,27 @@ jobs:
         id: set-matrix
         run: |
           set -euo pipefail
-          # Build the full image matrix once, then split into redistributable
-          # (images + manifests) and non-redistributable (test-only) subsets.
+          # Build the full image matrix once, then split into build_local=false
+          # (images + manifests) and build_local=true (test-only) subsets.
           source scripts/common.sh
           load_config_file
 
           bases_tmpdir="$(download_bases_archive)"
-          # Full matrix includes both archs and a redistributable flag for filtering.
+          # Full matrix includes both archs and a build_local flag for filtering.
           full_images_file="$(mktemp)"
           echo '{"include":[]}' > "${full_images_file}"
 
           for dir in agents/*; do
             [[ -d "${dir}" ]] || continue
             agent="$(basename "${dir}")"
-            redistributable="$(get_agent_field "${agent}" redistributable)"
+            build_local="$(get_agent_field "${agent}" build_local)"
             base_aliases="$(get_bases "${agent}" "${bases_tmpdir}/bases")"
             for base_alias in ${base_aliases}; do
-              # Append both arch variants with redistributable flag preserved.
+              # Append both arch variants with build_local flag preserved.
               jq -c \
                 --arg agent "${agent}" \
                 --arg base "${base_alias}" \
-                --argjson redistributable "${redistributable}" \
+                --argjson build_local "${build_local}" \
                 '
                   .include += [
                     {
@@ -96,7 +96,7 @@ jobs:
                       "arch": "amd64",
                       "platform": "linux/amd64",
                       "runner": "ubuntu-latest",
-                      "redistributable": $redistributable
+                      "build_local": $build_local
                     },
                     {
                       "agent": $agent,
@@ -104,7 +104,7 @@ jobs:
                       "arch": "arm64",
                       "platform": "linux/arm64",
                       "runner": "ubuntu-24.04-arm",
-                      "redistributable": $redistributable
+                      "build_local": $build_local
                     }
                   ]
                 ' \
@@ -113,20 +113,20 @@ jobs:
             done
           done
 
-          # Split full matrix into: redistributable images, redistributable manifests,
-          # and non-redistributable images for testing.
+          # Split full matrix into: build_local=false images, build_local=false manifests,
+          # and build_local=true images for testing.
           images_file="$(mktemp)"
           manifests_file="$(mktemp)"
           nr_images_file="$(mktemp)"
 
           jq -c \
-            '{include: [.include[] | select(.redistributable == true) | del(.redistributable)]}' \
+            '{include: [.include[] | select(.build_local == false) | del(.build_local)]}' \
             "${full_images_file}" > "${images_file}"
           jq -c \
-            '{include: ([.include[] | select(.redistributable == true) | {agent, base}] | unique)}' \
+            '{include: ([.include[] | select(.build_local == false) | {agent, base}] | unique)}' \
             "${full_images_file}" > "${manifests_file}"
           jq -c \
-            '{include: [.include[] | select(.redistributable == false) | del(.redistributable)]}' \
+            '{include: [.include[] | select(.build_local == true) | del(.build_local)]}' \
             "${full_images_file}" > "${nr_images_file}"
 
           images_json="$(cat "${images_file}")"
