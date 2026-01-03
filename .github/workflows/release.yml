@@ -6,6 +6,11 @@ run-name: Release (${{ github.ref_name }})
     tags:
       - "*"
 
+# Kill running refresh-images.yml workflows
+concurrency:
+  group: refresh-images
+  cancel-in-progress: true
+
 jobs:
 
   lint:
