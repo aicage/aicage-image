@@ -70,6 +70,7 @@ source "${ROOT_DIR}/scripts/common.sh"
 
 load_config_file
 IMAGE_REPOSITORY="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
+LOCAL_IMAGE_REPOSITORY="${AICAGE_LOCAL_IMAGE_REPOSITORY}"
 
 BASES_TMPDIR="$(download_bases_archive)"
 BASES_DIR="${BASES_TMPDIR}/bases"
@@ -94,10 +95,16 @@ for agent_dir in "${AGENTS_DIR}"/*; do
   agent_yaml="${agent_dir}/agent.yaml"
   [[ -f "${agent_yaml}" ]] || continue
 
+  if is_agent_field_true "${agent}" redistributable; then
+    agent_repository="${IMAGE_REPOSITORY}"
+  else
+    agent_repository="${LOCAL_IMAGE_REPOSITORY}"
+  fi
+
   mapfile -t valid_bases < <(get_bases "${agent}" "${BASES_DIR}")
   bases_list="$(mktemp)"
   for base_alias in "${valid_bases[@]}"; do
-    printf -- '%s: %s:%s-%s\n' "${base_alias}" "${IMAGE_REPOSITORY}" "${agent}" "${base_alias}" \
+    printf -- '%s: %s:%s-%s\n' "${base_alias}" "${agent_repository}" "${agent}" "${base_alias}" \
       >> "${bases_list}"
   done
 

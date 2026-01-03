@@ -7,7 +7,8 @@
     "AICAGE_IMAGE_REGISTRY_API_URL",
     "AICAGE_IMAGE_REGISTRY_API_TOKEN_URL",
     "AICAGE_IMAGE_BASE_REPOSITORY",
-    "AICAGE_IMAGE_REPOSITORY"
+    "AICAGE_IMAGE_REPOSITORY",
+    "AICAGE_LOCAL_IMAGE_REPOSITORY"
   ],
   "properties": {
     "AICAGE_IMAGE_REGISTRY": {
@@ -23,6 +24,9 @@
       "type": "string"
     },
     "AICAGE_IMAGE_REPOSITORY": {
+      "type": "string"
+    },
+    "AICAGE_LOCAL_IMAGE_REPOSITORY": {
       "type": "string"
     }
   },
