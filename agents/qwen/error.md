@@ -6,7 +6,8 @@ The error is displayed when exiting the agent right after start by repeatedly pr
 ## Details
 
 This error is shown:
-```
+
+```terminaloutput
 file:///usr/local/lib/node_modules/@qwen-code/qwen-code/cli.js:303297
     module2.exports = (string) => typeof string === "string" ? string.replace(ansiRegex3(), "") : string;
                                                                               ^

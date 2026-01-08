@@ -5,5 +5,5 @@ Works with base `fedora`.
 
 ## Details
 
-When running `copilot` in the image `ghcr.io/aicage/aicage:copilot-minimal` then no output is shown 
+When running `copilot` in the image `ghcr.io/aicage/aicage:copilot-minimal` then no output is shown
 and it returns 1.

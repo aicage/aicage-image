@@ -38,7 +38,7 @@ jobs:
         run: |
           yamllint .
           ruff check .
-          pymarkdown --config .pymarkdown.json scan .
+          pymarkdown --config .pymarkdown.json scan --recurse --exclude './.venv/' .
 
       - name: "Test: Validate config and agents with schemas"
         run: |
