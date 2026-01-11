@@ -234,4 +234,5 @@ jobs:
           generate_release_notes: true
           files: |
             agents.tar.gz
+            Dockerfile
             images-metadata.yaml
