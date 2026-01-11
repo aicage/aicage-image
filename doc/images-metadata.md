@@ -34,7 +34,7 @@ bases:
   ubuntu:
     base_image_distro: Ubuntu
     base_image_description: Ubuntu base
-    root_image: ubuntu:24.04
+    from_image: ubuntu:24.04
 agent:
   copilot:
     agent_full_name: GitHub Copilot CLI
