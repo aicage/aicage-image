@@ -175,6 +175,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: [test-non-redistributable, build-images]
+    env:
+      ROOT_DIR: ${{ github.workspace }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -226,6 +228,16 @@ jobs:
       - name: "Release: Package agents"
         run: tar -czf agents.tar.gz agents
 
+      - name: "Release: Get entrypoint.sh from 'aicage-image-base"
+        id: set-matrix
+        run: |
+          set -euo pipefail
+          source scripts/common.sh
+          load_config_file
+          curl_wrapper \
+            "https://github.com/${AICAGE_IMAGE_BASE_REPOSITORY}/releases/latest/download/entrypoint.sh" \
+            -o "entrypoint.sh"
+
       - name: "Release: Create GitHub release"
         uses: softprops/action-gh-release@v2
         with:
@@ -235,4 +247,5 @@ jobs:
           files: |
             agents.tar.gz
             Dockerfile
+            entrypoint.sh
             images-metadata.yaml
