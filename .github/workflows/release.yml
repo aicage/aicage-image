@@ -49,6 +49,10 @@ jobs:
             --schemafile doc/validation/config.schema.json \
             config.yaml
 
+  version-image-check:
+    name: Check agents version.sh with util-image
+    uses: ./.github/workflows/version-image-check.yml
+
   matrix:
     name: Build matrix
     runs-on: ubuntu-latest
@@ -160,13 +164,13 @@ jobs:
           printf '%s\n' "${MATRIX_NR_IMAGES}" | jq '.'
 
   test-non-redistributable:
-    needs: matrix
+    needs: [matrix, version-image-check]
     uses: ./.github/workflows/test-non-redistributable-agents.yml
     with:
       matrix_images: ${{ needs.matrix.outputs.MATRIX_NR_IMAGES }}
 
   build-images:
-    needs: [matrix, test-non-redistributable]
+    needs: [matrix, version-image-check, test-non-redistributable]
     uses: ./.github/workflows/build.yml
     with:
       matrix_images: ${{ needs.matrix.outputs.MATRIX_IMAGES }}

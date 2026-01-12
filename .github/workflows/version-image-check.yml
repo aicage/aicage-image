@@ -1,0 +1,22 @@
+name: Version Image Check
+
+"on":
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  version-image-check:
+    name: Version image check (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - name: Run version image check
+        env:
+          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
+        run: ./scripts/version-image-check.sh
