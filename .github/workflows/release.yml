@@ -230,13 +230,36 @@ jobs:
       - name: "Release: Package agents"
         run: tar -czf agents.tar.gz agents
 
+      - name: "Release: Package release artifacts"
+        run: |
+          mkdir dist
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          tar -czf dist/"${REPO_NAME}".tar.gz \
+            Dockerfile \
+            images-metadata.yaml
+
+      - name: "Release: Create SHA256SUMS"
+        run: |
+          cd dist
+          LC_ALL=C find . -maxdepth 1 -type f ! -name 'SHA256SUMS*' -print0 | \
+            sort -z | \
+            xargs -0 sha256sum \
+            > SHA256SUMS
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.0.0
+
+      - name: "Release: Keyless-sign SHA256SUMS"
+        run: |
+          cd dist
+          cosign sign-blob --yes \
+            --bundle SHA256SUMS.sigstore.json \
+            SHA256SUMS
+
       - name: "Release: Create GitHub release"
         uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ steps.resolve.outputs.AICAGE_VERSION }}
           tag_name: ${{ steps.resolve.outputs.AICAGE_VERSION }}
           generate_release_notes: true
-          files: |
-            agents.tar.gz
-            Dockerfile
-            images-metadata.yaml
+          files: dist/*
