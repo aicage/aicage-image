@@ -221,14 +221,12 @@ jobs:
             --schemafile doc/validation/images-metadata.schema.json \
             images-metadata.json
 
-      - name: "Release: Package agents"
-        run: tar -czf agents.tar.gz agents
-
       - name: "Release: Package release artifacts"
         run: |
           mkdir dist
           REPO_NAME="${GITHUB_REPOSITORY##*/}"
           tar -czf dist/"${REPO_NAME}".tar.gz \
+            agents \
             Dockerfile \
             images-metadata.yaml
 
