@@ -70,24 +70,49 @@ get_agent_list_field() {
     || _die "Failed to read ${field} from ${definition_file}"
 }
 
-download_bases_archive() {
-  local base_repo="${AICAGE_IMAGE_BASE_REPOSITORY}"
-  local url="https://github.com/${base_repo}/releases/latest/download/bases.tar.gz"
-  local tmpdir
+download_from_base_release() {
+  local tmpdir="$1"
+  local artifact="$2"
+  local url="https://github.com/${AICAGE_IMAGE_BASE_REPOSITORY}/releases/latest/download/${artifact}"
 
-  tmpdir="$(mktemp -d)" || _die "Failed to create temp dir"
-
-  if ! curl_wrapper "${url}" -o "${tmpdir}/bases.tar.gz"; then
+  if ! curl_wrapper "${url}" -o "${tmpdir}/${artifact}"; then
     _die "Failed to download ${url}"
   fi
+}
 
-  if ! tar -xzf "${tmpdir}/bases.tar.gz" -C "${tmpdir}"; then
-    _die "Failed to unpack ${tmpdir}/bases.tar.gz"
+download_bases_archive() {
+  local tmpdir
+  local base_repo="${AICAGE_IMAGE_BASE_REPOSITORY##*/}"
+
+  tmpdir="$(mktemp -d)" || _die "Failed to create temp dir"
+  pushd "${tmpdir}" >/dev/null
+
+  for artifact in "${base_repo}.tar.gz" SHA256SUMS SHA256SUMS.sigstore.json; do
+    download_from_base_release . "${artifact}"
+  done
+
+  if ! cosign verify-blob \
+    --bundle SHA256SUMS.sigstore.json \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    --certificate-identity-regexp '^https://github\.com/aicage/aicage-image-base/\.github/workflows/release\.yml@refs/tags/.*$' \
+    SHA256SUMS >&2 ; then
+    _die "Failed to verify signature of SHA256SUMS"
   fi
 
-  if [[ ! -d "${tmpdir}/bases" ]]; then
+  if ! sha256sum -c SHA256SUMS >&2 ; then
+    _die "Failed to verify artifact checksums with SHA256SUMS"
+  fi
+
+  if ! tar -xzf "${base_repo}.tar.gz"; then
+    _die "Failed to unpack ${base_repo}.tar.gz"
+  fi
+
+  rm SHA256SUMS SHA256SUMS.sigstore.json "${base_repo}.tar.gz" >/dev/null
+
+  if [[ ! -d "bases" ]]; then
     _die "Missing bases directory in ${url}"
   fi
+  popd >/dev/null
 
   printf '%s\n' "${tmpdir}"
 }

@@ -63,6 +63,9 @@ jobs:
         with:
           ref: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.0.0
+
       - name: Install pipeline dependencies
         run: |
           set -euo pipefail
