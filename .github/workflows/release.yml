@@ -192,43 +192,13 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
 
-      - name: "Release: Generate images metadata"
-        run: |
-          scripts/generate-images-metadata.sh \
-            --config config.yaml \
-            --agents-dir agents \
-            --output images-metadata.yaml \
-            --image-tag "${{ github.ref_name }}"
-
-      - name: "Test: Set up Python"
-        uses: actions/setup-python@v6.1.0
-        with:
-          python-version: "3.x"
-
-      - name: "Test: Remove Python yq and keep using Go yq"
-        run: |
-          python -m pip uninstall -y yq
-
-      - name: "Test: Install lint deps"
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: "Test: Validate images metadata"
-        run: |
-          yq -o=json '.' images-metadata.yaml > images-metadata.json
-          check-jsonschema \
-            --schemafile doc/validation/images-metadata.schema.json \
-            images-metadata.json
-
       - name: "Release: Package release artifacts"
         run: |
           mkdir dist
           REPO_NAME="${GITHUB_REPOSITORY##*/}"
           tar -czf dist/"${REPO_NAME}".tar.gz \
             agents \
-            Dockerfile \
-            images-metadata.yaml
+            Dockerfile
 
       - name: "Release: Create SHA256SUMS"
         run: |
