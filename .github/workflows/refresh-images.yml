@@ -51,7 +51,6 @@ jobs:
     needs: latest-release-tag
     outputs:
       MATRIX_IMAGES: ${{ steps.matrix.outputs.MATRIX_IMAGES }}
-      MATRIX_MANIFESTS: ${{ steps.matrix.outputs.MATRIX_MANIFESTS }}
       BUILD_COUNT: ${{ steps.matrix.outputs.BUILD_COUNT }}
     env:
       AICAGE_VERSION: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
@@ -225,9 +224,7 @@ jobs:
           fi
 
           build_matrix_file="$(mktemp)"
-          combos_file="$(mktemp)"
           echo '{"include":[]}' > "${build_matrix_file}"
-          echo '{"include":[]}' > "${combos_file}"
           while IFS=$'\t' read -r agent base_alias; do
             [[ -n "${agent}" ]] || continue
             jq -c \
@@ -237,28 +234,12 @@ jobs:
                 .include += [
                   {
                     "agent": $agent,
-                    "base": $base,
-                    "arch": "amd64",
-                    "platform": "linux/amd64",
-                    "runner": "ubuntu-latest"
-                  },
-                  {
-                    "agent": $agent,
-                    "base": $base,
-                    "arch": "arm64",
-                    "platform": "linux/arm64",
-                    "runner": "ubuntu-24.04-arm"
+                    "base": $base
                   }
                 ]
               ' \
               "${build_matrix_file}" > "${build_matrix_file}.tmp"
             mv "${build_matrix_file}.tmp" "${build_matrix_file}"
-            jq -c \
-              --arg agent "${agent}" \
-              --arg base "${base_alias}" \
-              '.include += [{"agent": $agent, "base": $base}]' \
-              "${combos_file}" > "${combos_file}.tmp"
-            mv "${combos_file}.tmp" "${combos_file}"
           done < "${BUILD_LIST}"
 
           build_count="$(jq -r '.include | length' "${build_matrix_file}")"
@@ -266,14 +247,10 @@ jobs:
             echo "No image rebuilds required."
           fi
           build_matrix_json="$(cat "${build_matrix_file}")"
-          combos_json="$(cat "${combos_file}")"
           echo "Build matrix:"
           jq '.' "${build_matrix_file}"
-          echo "Manifest matrix:"
-          jq '.' "${combos_file}"
           {
             printf 'MATRIX_IMAGES=%s\n' "${build_matrix_json}"
-            printf 'MATRIX_MANIFESTS=%s\n' "${combos_json}"
             printf 'BUILD_COUNT=%s\n' "${build_count}"
           } >> "$GITHUB_OUTPUT"
 
@@ -283,8 +260,12 @@ jobs:
       - latest-release-tag
       - refresh
     if: ${{ needs.refresh.outputs.BUILD_COUNT != '0' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.refresh.outputs.MATRIX_IMAGES) }}
     uses: ./.github/workflows/build.yml
     with:
       git_ref: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
-      matrix_images: ${{ needs.refresh.outputs.MATRIX_IMAGES }}
-      matrix_manifests: ${{ needs.refresh.outputs.MATRIX_MANIFESTS }}
+      agent: ${{ matrix.agent }}
+      base: ${{ matrix.base }}
+    secrets: inherit

@@ -1,63 +1,71 @@
-name: Build Agent Images
-run-name: Build agent images (${{ github.ref_name }})
+name: Build Agent Image
+run-name: Build agent image (${{ inputs.agent }}-${{ inputs.base }})
 
 "on":
   workflow_call:
     inputs:
+      base:
+        description: Base alias to build (matches bases/<alias>)
+        required: true
+        type: string
+      agent:
+        description: Agent alias to build (matches agents/<alias>)
+        required: true
+        type: string
+      git_ref:
+        description: Git ref to check out (tag/branch/SHA). Defaults to the workflow ref.
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Base alias to build (matches bases/<alias>)
+        required: true
+        type: string
+      agent:
+        description: Agent alias to build (matches agents/<alias>)
+        required: true
+        type: string
       git_ref:
         description: Git ref to check out (tag/branch/SHA). Defaults to the workflow ref.
         required: false
         default: ""
         type: string
-      matrix_images:
-        description: JSON image matrix with include entries ({agent, base, arch, platform, runner})
-        required: true
-        type: string
-      matrix_manifests:
-        description: JSON manifest matrix with include entries ({agent, base})
-        required: true
-        type: string
-  workflow_dispatch:
-    inputs:
-      matrix_images:
-        description: JSON image matrix with include entries ({agent, base, arch, platform, runner})
-        required: true
-        default: >-
-          {"include":[{"agent":"bar","base":"foo","arch":"amd64",
-          "platform":"linux/amd64","runner":"ubuntu-latest"},{"agent":"bar",
-          "base":"foo","arch":"arm64","platform":"linux/arm64",
-          "runner":"ubuntu-24.04-arm"}]}
-        type: string
-      matrix_manifests:
-        description: JSON manifest matrix with include entries ({agent, base})
-        required: true
-        default: '{"include":[{"agent":"bar","base":"foo"}]}'
-        type: string
-
-concurrency:
-  group: build-${{ github.run_id }}
-  cancel-in-progress: false
 
 permissions:
   contents: read
   packages: write
   id-token: write
+  actions: read
 
 jobs:
 
   build:
-    name: "${{ matrix.arch }}: Build, test, and publish ${{ matrix.base }}-${{ matrix.agent }}"
+    name: "${{ matrix.arch }}: Build and test ${{ inputs.base }}-${{ inputs.agent }}"
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(inputs.matrix_images) }}
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
     env:
       PLATFORM: ${{ matrix.platform }}
       ARCH_SUFFIX: ${{ matrix.arch }}
-      BASE_ALIAS: ${{ matrix.base }}
-      AGENT: ${{ matrix.agent }}
+      BASE_ALIAS: ${{ inputs.base }}
+      AGENT: ${{ inputs.agent }}
       ROOT_DIR: ${{ github.workspace }}
       AICAGE_VERSION: ${{ inputs.git_ref || github.ref_name }}
+    outputs:
+      INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.INDEX_DIGEST }}
+      INDEX_DIGEST_arm64: ${{ steps.out-arm64.outputs.INDEX_DIGEST }}
+      IMAGE_REF: ${{ steps.config.outputs.IMAGE_REF }}
+      VERSION_TAG: ${{ steps.config.outputs.VERSION_TAG }}
+      PURPOSE_TAG: ${{ steps.config.outputs.PURPOSE_TAG }}
 
     steps:
       - name: Checkout
@@ -84,12 +92,10 @@ jobs:
             exit 1
           fi
           BASE_IMAGE="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_BASE_REPOSITORY}:${BASE_ALIAS}"
-          IMAGE_NAME="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
-          MANIFEST_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${AGENT_VERSION}-${BASE_ALIAS}-${AICAGE_VERSION}"
-          MANIFEST_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}"
-          IMAGE_VERSION_TAG="${MANIFEST_VERSION_TAG}-${ARCH_SUFFIX}"
-          IMAGE_LATEST_TAG="${MANIFEST_LATEST_TAG}-${ARCH_SUFFIX}"
-          IMAGE_TEST_TAG="${IMAGE_VERSION_TAG}-test"
+          IMAGE_REF="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
+          VERSION_TAG="${AGENT}-${AGENT_VERSION}-${BASE_ALIAS}-${AICAGE_VERSION}"
+          PURPOSE_TAG="${AGENT}-${BASE_ALIAS}"
+          IMAGE_TEST_TAG="${IMAGE_REF}:${VERSION_TAG}-${ARCH_SUFFIX}-test"
 
           BASES_TMPDIR="$(download_bases_archive)"
           ALLOWED_BASES="$(get_bases "${AGENT}" "${BASES_TMPDIR}/bases" "${BASE_ALIAS}")"
@@ -99,20 +105,16 @@ jobs:
           fi
           {
             echo "BASE_IMAGE=${BASE_IMAGE}"
-            echo "IMAGE_NAME=${IMAGE_NAME}"
-            echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
-            echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
-            echo "IMAGE_VERSION_TAG=${IMAGE_VERSION_TAG}"
-            echo "IMAGE_LATEST_TAG=${IMAGE_LATEST_TAG}"
+            echo "IMAGE_REF=${IMAGE_REF}"
+            echo "VERSION_TAG=${VERSION_TAG}"
+            echo "PURPOSE_TAG=${PURPOSE_TAG}"
             echo "IMAGE_TEST_TAG=${IMAGE_TEST_TAG}"
           } >> "$GITHUB_OUTPUT"
           {
             echo "BASE_IMAGE=${BASE_IMAGE}"
-            echo "IMAGE_NAME=${IMAGE_NAME}"
-            echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
-            echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
-            echo "IMAGE_VERSION_TAG=${IMAGE_VERSION_TAG}"
-            echo "IMAGE_LATEST_TAG=${IMAGE_LATEST_TAG}"
+            echo "IMAGE_REF=${IMAGE_REF}"
+            echo "VERSION_TAG=${VERSION_TAG}"
+            echo "PURPOSE_TAG=${PURPOSE_TAG}"
             echo "IMAGE_TEST_TAG=${IMAGE_TEST_TAG}"
           } >> "$GITHUB_ENV"
 
@@ -150,178 +152,36 @@ jobs:
         run: |
           set -euo pipefail
           scripts/test.sh \
-            --image "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}" \
+            --image "${IMAGE_REF}@${{ steps.build_image.outputs.digest }}" \
             --agent "${AGENT}"
 
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.0.0
-
-      - name: Sign image with cosign
+      - name: Export digest (amd64)
+        id: out-amd64
+        if: matrix.arch == 'amd64'
         run: |
           set -euo pipefail
-          cosign sign --yes \
-            "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}"
+          (
+            echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}"
+          ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
-      - name: Verify image signature
+      - name: Export digest (arm64)
+        id: out-arm64
+        if: matrix.arch == 'arm64'
         run: |
           set -euo pipefail
-          cosign verify \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp \
-              "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
-            "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}"
+          (
+            echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}"
+          ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
-      - name: "Publish: Set architecture-specific image tag"
-        run: |
-          set -euo pipefail
-          # Promote the already-built & provenanced artifact by digest (no rebuild)
-          docker buildx imagetools create \
-            --tag "${IMAGE_VERSION_TAG}" \
-            --tag "${IMAGE_LATEST_TAG}" \
-            "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}"
-
-      - name: Install ORAS
-        uses: oras-project/setup-oras@v1
-
-      - name: Delete test image tag
-        run: |
-          set -euo pipefail
-          oras manifest delete "${IMAGE_TEST_TAG}"
-
-      - name: Save image digest
-        run: |
-          set -euo pipefail
-          printf '%s\n' "${{ steps.build_image.outputs.digest }}" > digest.txt
-
-      - name: Upload image digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digest-${{ matrix.agent }}-${{ matrix.base }}-${{ matrix.arch }}
-          path: digest.txt
-          retention-days: 1
-
-  manifest:
-    name: Publish multi-arch manifest ${{ matrix.base }}-${{ matrix.agent }}
-    runs-on: ubuntu-latest
+  multiarch:
+    name: Run multi-arch sign/provenance/publish
     needs: build
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(inputs.matrix_manifests) }}
-    env:
-      BASE_ALIAS: ${{ matrix.base }}
-      AGENT: ${{ matrix.agent }}
-      ROOT_DIR: ${{ github.workspace }}
-      AICAGE_VERSION: ${{ inputs.git_ref || github.ref_name }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6.0.1
-        with:
-          ref: ${{ inputs.git_ref || github.ref }}
-
-      - name: Load config file
-        id: config
-        run: |
-          set -euo pipefail
-          source scripts/common.sh
-          load_config_file
-          AGENT_VERSION="$(agents/${AGENT}/version.sh)"
-          if [[ -z "${AGENT_VERSION}" ]]; then
-            echo "Agent version is empty for ${AGENT}" >&2
-            exit 1
-          fi
-          IMAGE_NAME="${AICAGE_IMAGE_REGISTRY}/${AICAGE_IMAGE_REPOSITORY}"
-          MANIFEST_VERSION_TAG="${IMAGE_NAME}:${AGENT}-${AGENT_VERSION}-${BASE_ALIAS}-${AICAGE_VERSION}"
-          MANIFEST_LATEST_TAG="${IMAGE_NAME}:${AGENT}-${BASE_ALIAS}"
-          MANIFEST_TEST_TAG="${MANIFEST_VERSION_TAG}-test"
-          {
-            echo "IMAGE_NAME=${IMAGE_NAME}"
-            echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
-            echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
-            echo "MANIFEST_TEST_TAG=${MANIFEST_TEST_TAG}"
-          } >> "$GITHUB_OUTPUT"
-          {
-            echo "IMAGE_NAME=${IMAGE_NAME}"
-            echo "MANIFEST_VERSION_TAG=${MANIFEST_VERSION_TAG}"
-            echo "MANIFEST_LATEST_TAG=${MANIFEST_LATEST_TAG}"
-            echo "MANIFEST_TEST_TAG=${MANIFEST_TEST_TAG}"
-          } >> "$GITHUB_ENV"
-
-      - name: Download amd64 digest
-        uses: actions/download-artifact@v4
-        with:
-          name: digest-${{ matrix.agent }}-${{ matrix.base }}-amd64
-          path: digest/amd64
-
-      - name: Download arm64 digest
-        uses: actions/download-artifact@v4
-        with:
-          name: digest-${{ matrix.agent }}-${{ matrix.base }}-arm64
-          path: digest/arm64
-
-      - name: Load digests
-        id: digests
-        run: |
-          set -euo pipefail
-          DIGEST_AMD64="$(cat digest/amd64/digest.txt)"
-          DIGEST_ARM64="$(cat digest/arm64/digest.txt)"
-          {
-            echo "AICAGE_IMAGE_DIGEST_amd64=${DIGEST_AMD64}"
-            echo "AICAGE_IMAGE_DIGEST_arm64=${DIGEST_ARM64}"
-          } >> "$GITHUB_ENV"
-
-      - name: "Set up Buildx"
-        uses: docker/setup-buildx-action@v3.11.1
-        with:
-          driver: docker-container
-
-      - name: "Log in to Docker Hub"
-        uses: docker/login-action@v3.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: "Publish: Create and push multi-arch manifest"
-        id: build_manifest
-        run: |
-          set -euo pipefail
-          docker buildx imagetools create \
-              --tag "${MANIFEST_TEST_TAG}" \
-              "${AICAGE_IMAGE_DIGEST_amd64}" \
-              "${AICAGE_IMAGE_DIGEST_arm64}"
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.0.0
-
-      - name: "Publish: Sign multi-arch manifest"
-        run: |
-          set -euo pipefail
-          cosign sign --yes \
-            "${MANIFEST_TEST_TAG}"
-
-      - name: "Test: Verify multi-arch manifest signature"
-        run: |
-          set -euo pipefail
-          cosign verify \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp \
-              "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
-            "${MANIFEST_TEST_TAG}"
-
-      - name: "Publish: Set tags for multi-arch manifest"
-        run: |
-          set -euo pipefail
-          # Promote the already-built & provenanced artifact by digest (no rebuild)
-          docker buildx imagetools create \
-            --tag "${MANIFEST_VERSION_TAG}" \
-            --tag "${MANIFEST_LATEST_TAG}" \
-            "${MANIFEST_TEST_TAG}"
-
-      - name: Install ORAS
-        uses: oras-project/setup-oras@v1
-
-      - name: Delete test image tag
-        run: |
-          set -euo pipefail
-          oras manifest delete "${MANIFEST_TEST_TAG}"
+    uses: aicage/github-actions/.github/workflows/multiarch-image-build-sign-provenance.yml@0.2.0
+    with:
+      image_ref: ${{ needs.build.outputs.IMAGE_REF }}
+      version_tag: ${{ needs.build.outputs.VERSION_TAG }}
+      purpose_tag: ${{ needs.build.outputs.PURPOSE_TAG }}
+      index_digest_amd64: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
+      index_digest_arm64: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+      actions_ref: 0.2.0
+    secrets: inherit

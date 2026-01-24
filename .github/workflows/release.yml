@@ -61,7 +61,6 @@ jobs:
       ROOT_DIR: ${{ github.workspace }}
     outputs:
       MATRIX_IMAGES: ${{ steps.set-matrix.outputs.MATRIX_IMAGES }}
-      MATRIX_MANIFESTS: ${{ steps.set-matrix.outputs.MATRIX_MANIFESTS }}
       MATRIX_NR_IMAGES: ${{ steps.set-matrix.outputs.MATRIX_NR_IMAGES }}
     steps:
       - name: Checkout
@@ -123,25 +122,19 @@ jobs:
           # Split full matrix into: build_local=false images, build_local=false manifests,
           # and build_local=true images for testing.
           images_file="$(mktemp)"
-          manifests_file="$(mktemp)"
           nr_images_file="$(mktemp)"
 
           jq -c \
-            '{include: [.include[] | select(.build_local == false) | del(.build_local)]}' \
-            "${full_images_file}" > "${images_file}"
-          jq -c \
             '{include: ([.include[] | select(.build_local == false) | {agent, base}] | unique)}' \
-            "${full_images_file}" > "${manifests_file}"
+            "${full_images_file}" > "${images_file}"
           jq -c \
             '{include: [.include[] | select(.build_local == true) | del(.build_local)]}' \
             "${full_images_file}" > "${nr_images_file}"
 
           images_json="$(cat "${images_file}")"
-          manifests_json="$(cat "${manifests_file}")"
           nr_images_json="$(cat "${nr_images_file}")"
           {
             echo "MATRIX_IMAGES=${images_json}"
-            echo "MATRIX_MANIFESTS=${manifests_json}"
             echo "MATRIX_NR_IMAGES=${nr_images_json}"
           } >> "$GITHUB_OUTPUT"
 
@@ -151,13 +144,6 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' "${MATRIX_IMAGES}" | jq '.'
-
-      - name: Print manifest matrix
-        env:
-          MATRIX_MANIFESTS: ${{ steps.set-matrix.outputs.MATRIX_MANIFESTS }}
-        run: |
-          set -euo pipefail
-          printf '%s\n' "${MATRIX_MANIFESTS}" | jq '.'
 
       - name: Print non-redistributable matrix
         env:
@@ -174,10 +160,15 @@ jobs:
 
   build-images:
     needs: [matrix, version-image-check, test-non-redistributable]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.MATRIX_IMAGES) }}
     uses: ./.github/workflows/build.yml
     with:
-      matrix_images: ${{ needs.matrix.outputs.MATRIX_IMAGES }}
-      matrix_manifests: ${{ needs.matrix.outputs.MATRIX_MANIFESTS }}
+      agent: ${{ matrix.agent }}
+      base: ${{ matrix.base }}
+      git_ref: ${{ github.ref_name }}
+    secrets: inherit
 
   release:
     runs-on: ubuntu-latest
