@@ -7,7 +7,7 @@ setup() {
     exit 1
   fi
 
-  AGENT_METADATA_FILE="${ROOT_DIR}/agents/${AGENT}/agent.yaml"
+  AGENT_METADATA_FILE="${ROOT_DIR}/agents/${AGENT}/agent.yml"
   if [[ ! -f "${AGENT_METADATA_FILE}" ]]; then
     echo "Metadata file not found for agent '${AGENT}'" >&2
     exit 1

@@ -5,7 +5,7 @@ doc plus `DEVELOPMENT.md` for build/test workflow details.
 
 ## How to work
 
-- Read `DEVELOPMENT.md` for prerequisites, commands, and configuration (`config.yaml`).
+- Read `DEVELOPMENT.md` for prerequisites, commands, and configuration (`config.yml`).
 - Use `rg` for searches; avoid destructive commands and do not revert user changes.
 - Follow repo style: Bash scripts with `#!/usr/bin/env bash`, `set -euo pipefail`, two-space indents;
   Dockerfiles declare args at the top; Markdown wraps near ~100 chars.

@@ -44,10 +44,10 @@ jobs:
         run: |
           check-jsonschema \
             --schemafile doc/validation/agent.schema.json \
-            agents/*/agent.yaml
+            agents/*/agent.yml
           check-jsonschema \
             --schemafile doc/validation/config.schema.json \
-            config.yaml
+            config.yml
 
   version-image-check:
     name: Check agents version.sh with util-image

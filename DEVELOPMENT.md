@@ -23,14 +23,14 @@ pip install -r requirements-dev.txt
 
 - `Dockerfile` — Build entrypoint for agent images.
 - `agents/<agent>/install.sh` — Installer for each agent.
-- `agents/<agent>/agent.yaml` — Key/value metadata labels baked into the image.
+- `agents/<agent>/agent.yml` — Key/value metadata labels baked into the image.
 - `scripts/` — Build and test helpers.
 - `tests/smoke/` — Bats suites that verify each agent’s image.
-- `config.yaml` — Default repositories, platforms, and version tags.
+- `config.yml` — Default repositories, platforms, and version tags.
 
 ## Configuration
 
-Setting from `config.yaml`:
+Setting from `config.yml`:
 
 - `AICAGE_IMAGE_REGISTRY` (default `ghcr.io`)
 - `AICAGE_IMAGE_BASE_REPOSITORY` (default `aicage/aicage-image-base`)
@@ -46,7 +46,7 @@ Base aliases are discovered from the latest release artifact
 # Build and load a single agent image (host architecture)
 scripts/debug/build.sh --agent codex --base ubuntu
 
-# Build the full agent/base matrix (tags derived from config.yaml)
+# Build the full agent/base matrix (tags derived from config.yml)
 scripts/debug/build-all.sh
 ```
 
@@ -56,7 +56,7 @@ scripts/debug/build-all.sh
 # Test a specific image
 scripts/test.sh --image ghcr.io/aicage/aicage:codex-ubuntu --agent codex
 
-# Test the full matrix (tags derived from config.yaml and available base aliases)
+# Test the full matrix (tags derived from config.yml and available base aliases)
 scripts/test-all.sh
 ```
 
@@ -65,9 +65,9 @@ Smoke suites live in `tests/smoke/`; use `bats` directly if you need to run one 
 ## Adding an agent
 
 1. Create `agents/<agent>/install.sh` (executable) that installs the agent; fail fast on errors.
-2. Add `agents/<agent>/agent.yaml` with any metadata that should appear as image labels.
+2. Add `agents/<agent>/agent.yml` with any metadata that should appear as image labels.
    Optional filters: `base_exclude` and `base_distro_exclude` (lists).
-3. Add the agent to `AICAGE_AGENTS` in `config.yaml` if it isn’t discovered automatically.
+3. Add the agent to `AICAGE_AGENTS` in `config.yml` if it isn’t discovered automatically.
 4. Add smoke coverage in `tests/smoke/<agent>.bats`.
 5. Document the agent in `README.md` if it should be visible to users.
 

@@ -23,7 +23,7 @@ curl_wrapper() {
 }
 
 load_config_file() {
-  local config_file="${ROOT_DIR}/config.yaml"
+  local config_file="${ROOT_DIR}/config.yml"
   [[ -f "${config_file}" ]] || _die "Config file not found: ${config_file}"
 
   while IFS=$'\t' read -r key value; do
@@ -38,10 +38,10 @@ get_agent_field() {
   local agent="$1"
   local field="$2"
   local agent_dir="${AGENT_DEFINITIONS_DIR}/${agent}"
-  local definition_file="${agent_dir}/agent.yaml"
+  local definition_file="${agent_dir}/agent.yml"
 
   [[ -d "${agent_dir}" ]] || _die "Agent '${agent}' not found under ${AGENT_DEFINITIONS_DIR}"
-  [[ -f "${definition_file}" ]] || _die "Missing agent.yaml for '${agent}'"
+  [[ -f "${definition_file}" ]] || _die "Missing agent.yml for '${agent}'"
 
   local value
   value="$(yq -r ".${field}" "${definition_file}")" || _die "Failed to read ${field} from ${definition_file}"
@@ -61,10 +61,10 @@ get_agent_list_field() {
   local agent="$1"
   local field="$2"
   local agent_dir="${AGENT_DEFINITIONS_DIR}/${agent}"
-  local definition_file="${agent_dir}/agent.yaml"
+  local definition_file="${agent_dir}/agent.yml"
 
   [[ -d "${agent_dir}" ]] || _die "Agent '${agent}' not found under ${AGENT_DEFINITIONS_DIR}"
-  [[ -f "${definition_file}" ]] || _die "Missing agent.yaml for '${agent}'"
+  [[ -f "${definition_file}" ]] || _die "Missing agent.yml for '${agent}'"
 
   yq -r ".${field} // [] | .[]" "${definition_file}" \
     || _die "Failed to read ${field} from ${definition_file}"
@@ -162,8 +162,8 @@ get_bases() {
     fi
 
     if [[ ${#base_distro_exclude[@]} -gt 0 ]]; then
-      base_yaml="${bases_dir}/${alias}/base.yaml"
-      [[ -f "${base_yaml}" ]] || _die "Missing base.yaml for ${alias} in ${bases_dir}"
+      base_yaml="${bases_dir}/${alias}/base.yml"
+      [[ -f "${base_yaml}" ]] || _die "Missing base.yml for ${alias} in ${bases_dir}"
       distro="$(yq -er '.base_image_distro' "${base_yaml}")" \
         || _die "Failed to read base_image_distro from ${base_yaml}"
       distro_lc="$(normalize_value "${distro}")"
