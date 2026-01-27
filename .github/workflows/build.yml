@@ -76,6 +76,18 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
 
+      - name: "Set up Buildx"
+        uses: docker/setup-buildx-action@v3.11.1
+        with:
+          driver: docker-container
+
+      - name: "Log in to Docker Hub"
+        uses: docker/login-action@v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Load config file
         id: config
         run: |
@@ -118,17 +130,23 @@ jobs:
             echo "IMAGE_TEST_TAG=${IMAGE_TEST_TAG}"
           } >> "$GITHUB_ENV"
 
-      - name: "Set up Buildx"
-        uses: docker/setup-buildx-action@v3.11.1
-        with:
-          driver: docker-container
+      - name: Resolve base image digest
+        id: base-image-digest
+        run: |
+          set -euo pipefail
+          digest="$(docker buildx imagetools inspect "${BASE_IMAGE}" --format '{{json .Manifest}}' | jq -r '.digest')"
+          if [[ -z "${digest}" ]]; then
+            echo "Failed to resolve digest for ${BASE_IMAGE}" >&2
+            exit 1
+          fi
+          {
+            echo "BASE_IMAGE_DIGEST_REF=${BASE_IMAGE}@${digest}"
+          } | tee /dev/stderr >> "$GITHUB_ENV"
 
-      - name: "Log in to Docker Hub"
-        uses: docker/login-action@v3.6.0
+      - name: Verify base image signature
+        uses: aicage/github-actions/.github/actions/cosign-verify@0.2.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ env.BASE_IMAGE_DIGEST_REF }}
 
       - name: Build test image tag
         id: build_image
@@ -138,7 +156,7 @@ jobs:
           push: true
           provenance: true
           build-args: |
-            BASE_IMAGE=${{ env.BASE_IMAGE }}
+            BASE_IMAGE=${{ env.BASE_IMAGE_DIGEST_REF }}
             AGENT=${{ env.AGENT }}
           tags: |
             ${{ steps.config.outputs.IMAGE_TEST_TAG }}
