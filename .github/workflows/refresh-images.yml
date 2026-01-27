@@ -1,5 +1,5 @@
-name: Refresh Agent Images (Agent Versions)
-run-name: Refresh agent-version images (${{ github.ref_name }})
+name: Refresh Agent Images (Latest Release Ref)
+run-name: Dispatch refresh-images.yml at latest release tag
 
 "on":
   # The scheduler on GitHub is not reliable enough so a cron job at cron-job.org triggers this by workflow_dispatch
@@ -7,24 +7,21 @@ run-name: Refresh agent-version images (${{ github.ref_name }})
   #     - cron: "7,27,47 * * * *"
   workflow_dispatch: {}
 
-concurrency:
-  group: refresh-images
-  cancel-in-progress: false
+permissions:
+  actions: write
+  contents: read
 
 jobs:
 
   latest-release-tag:
     runs-on: ubuntu-latest
-    env:
-      AICAGE_VERSION: ${{ github.ref }}
-    outputs:
-      AICAGE_VERSION: ${{ steps.config.outputs.AICAGE_VERSION }}
+
     steps:
-      - name: "Config: Get tag of latest release"
-        id: config
+
+      - name: Get latest release tag
+        id: latest
         run: |
           set -euo pipefail
-
           AICAGE_VERSION="$(
             curl \
               -fsSL \
@@ -33,11 +30,11 @@ jobs:
               --retry-delay 2 \
               --max-time 300 \
               -H "Accept: application/vnd.github+json" \
-              https://api.github.com/repos/aicage/aicage-image/releases/latest \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/latest" \
             | jq -r '.tag_name' \
           )"
           if [[ -z "${AICAGE_VERSION}" ]]; then
-            echo "Git tag is empty for latest release" >&2
+            echo "Latest release tag is empty" >&2
             exit 1
           fi
           {
@@ -45,227 +42,10 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Latest release tag: ${AICAGE_VERSION}"
 
-  refresh:
-    name: Refresh agent/base images for ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
-    runs-on: ubuntu-latest
-    needs: latest-release-tag
-    outputs:
-      MATRIX_IMAGES: ${{ steps.matrix.outputs.MATRIX_IMAGES }}
-      BUILD_COUNT: ${{ steps.matrix.outputs.BUILD_COUNT }}
-    env:
-      AICAGE_VERSION: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
-      ROOT_DIR: ${{ github.workspace }}
-    steps:
-
-      - name: Checkout
-        uses: actions/checkout@v6.0.1
-        with:
-          ref: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.0.0
-
-      - name: Install pipeline dependencies
+      - name: Dispatch refresh worker at release ref
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.latest.outputs.AICAGE_VERSION }}
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y skopeo
-
-      - name: Check whether images need to be built
-        id: matrix
-        run: |
-          set -euo pipefail
-          source scripts/common.sh
-          source scripts/refresh-images-lib.sh
-          load_config_file
-
-          MAX_PARALLEL="${REFRESH_CHECKS_PARALLELISM:-12}"
-          FORCE_BUILD="false"
-          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
-            FORCE_BUILD="true"
-          fi
-
-          BASES_TMPDIR="$(download_bases_archive)"
-          LOG_DIR="$(mktemp -d)"
-          BUILD_LIST="$(mktemp)"
-          BUILD_LIST_LOCK="$(mktemp)"
-          error_count=0
-          pids=()
-          declare -A pid_to_log pid_to_label
-
-          log_name() {
-            printf '%s' "$1" | tr -c '[:alnum:]_.-' '_'
-          }
-
-          append_build() {
-            local agent="$1"
-            local base_alias="$2"
-
-            flock "${BUILD_LIST_LOCK}" \
-              bash -c 'printf "%s\t%s\n" "$1" "$2" >> "$3"' \
-              _ \
-              "${agent}" \
-              "${base_alias}" \
-              "${BUILD_LIST}"
-          }
-
-          needs_rebuild_status() {
-            local agent="$1"
-            local base_alias="$2"
-            local agent_version="$3"
-            local status output
-
-            set +e
-            output="$(needs_rebuild "${base_alias}" "${agent}-${agent_version}-${base_alias}-${AICAGE_VERSION}" 2>&1)"
-            status=$?
-            set -e
-
-            NEEDS_REBUILD_OUTPUT="${output}"
-            printf '%s\n' "${status}"
-          }
-
-          report_pid_result() {
-            local pid="$1"
-            local status="$2"
-
-            if [[ "${status}" -ne 0 ]]; then
-              error_count=$((error_count + 1))
-              echo "Check failed: ${pid_to_label[${pid}]}" >&2
-              sed 's/^/  /' "${pid_to_log[${pid}]}" >&2
-            else
-              cat "${pid_to_log[${pid}]}"
-            fi
-          }
-
-          wait_for_slot() {
-            local finished_pid status
-
-            if [[ "${#pids[@]}" -ge "${MAX_PARALLEL}" ]]; then
-              if wait -n -p finished_pid; then
-                status=0
-              else
-                status=$?
-              fi
-              report_pid_result "${finished_pid}" "${status}"
-              mapfile -t pids < <(jobs -p)
-            fi
-          }
-
-          run_check() {
-            local agent="$1"
-            local base_alias="$2"
-            local agent_version="$3"
-
-            if [[ "${FORCE_BUILD}" == "true" ]]; then
-              echo "Forcing build for ${agent} (${base_alias}) due to ${GITHUB_EVENT_NAME}"
-              append_build "${agent}" "${base_alias}"
-              return 0
-            fi
-
-            local status
-            status="$(needs_rebuild_status "${agent}" "${base_alias}" "${agent_version}")"
-            case "${status}" in
-              0)
-                echo "Needs build ${agent} (${base_alias}) for ${AICAGE_VERSION}"
-                append_build "${agent}" "${base_alias}"
-                return 0
-                ;;
-              1)
-                echo "Up-to-date ${agent} (${base_alias})"
-                return 0
-                ;;
-              *)
-                if [[ -n "${NEEDS_REBUILD_OUTPUT}" ]]; then
-                  echo "${NEEDS_REBUILD_OUTPUT}" >&2
-                fi
-                echo "Failed to determine rebuild for ${agent} (${base_alias})" >&2
-                return 1
-                ;;
-            esac
-          }
-
-          for dir in agents/*; do
-            [ -d "${dir}" ] || continue
-            AGENT="$(basename "${dir}")"
-            if is_agent_field_true "${AGENT}" build_local; then
-              echo "Skipping non-redistributable agent ${AGENT}"
-              continue
-            fi
-            AGENT_VERSION="$(agents/${AGENT}/version.sh)"
-            if [[ -z "${AGENT_VERSION}" ]]; then
-              echo "Agent version is empty for ${AGENT}" >&2
-              exit 1
-            fi
-            BASE_ALIASES="$(get_bases "${AGENT}" "${BASES_TMPDIR}/bases")"
-
-            for BASE_ALIAS in ${BASE_ALIASES}; do
-              log_file="${LOG_DIR}/$(log_name "${AGENT}_${BASE_ALIAS}").log"
-              run_check "${AGENT}" "${BASE_ALIAS}" "${AGENT_VERSION}" >"${log_file}" 2>&1 &
-              pid="$!"
-              pids+=("${pid}")
-              pid_to_log["${pid}"]="${log_file}"
-              pid_to_label["${pid}"]="${AGENT} (${BASE_ALIAS})"
-
-              wait_for_slot
-            done
-          done
-
-          for pid in "${pids[@]}"; do
-            if wait "${pid}"; then
-              report_pid_result "${pid}" 0
-            else
-              report_pid_result "${pid}" $?
-            fi
-          done
-
-          if [[ "${error_count}" -gt 0 ]]; then
-            echo "Refresh checks reported ${error_count} error(s)." >&2
-            exit 1
-          fi
-
-          build_matrix_file="$(mktemp)"
-          echo '{"include":[]}' > "${build_matrix_file}"
-          while IFS=$'\t' read -r agent base_alias; do
-            [[ -n "${agent}" ]] || continue
-            jq -c \
-              --arg agent "${agent}" \
-              --arg base "${base_alias}" \
-              '
-                .include += [
-                  {
-                    "agent": $agent,
-                    "base": $base
-                  }
-                ]
-              ' \
-              "${build_matrix_file}" > "${build_matrix_file}.tmp"
-            mv "${build_matrix_file}.tmp" "${build_matrix_file}"
-          done < "${BUILD_LIST}"
-
-          build_count="$(jq -r '.include | length' "${build_matrix_file}")"
-          if [[ "${build_count}" -eq 0 ]]; then
-            echo "No image rebuilds required."
-          fi
-          build_matrix_json="$(cat "${build_matrix_file}")"
-          echo "Build matrix:"
-          jq '.' "${build_matrix_file}"
-          {
-            printf 'MATRIX_IMAGES=%s\n' "${build_matrix_json}"
-            printf 'BUILD_COUNT=%s\n' "${build_count}"
-          } >> "$GITHUB_OUTPUT"
-
-  build-images:
-    name: Build needed images
-    needs:
-      - latest-release-tag
-      - refresh
-    if: ${{ needs.refresh.outputs.BUILD_COUNT != '0' }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.refresh.outputs.MATRIX_IMAGES) }}
-    uses: ./.github/workflows/build.yml
-    with:
-      git_ref: ${{ needs.latest-release-tag.outputs.AICAGE_VERSION }}
-      agent: ${{ matrix.agent }}
-      base: ${{ matrix.base }}
-    secrets: inherit
+          gh workflow run refresh-images-worker.yml --ref "${TAG}"
