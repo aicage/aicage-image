@@ -48,4 +48,4 @@ jobs:
           TAG: ${{ steps.latest.outputs.AICAGE_VERSION }}
         run: |
           set -euo pipefail
-          gh workflow run refresh-images-worker.yml --ref "${TAG}"
+          gh workflow run refresh-images-worker.yml --ref "${TAG}" --repo "${GITHUB_REPOSITORY}"
