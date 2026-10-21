@@ -31,7 +31,7 @@ load_config_file() {
     if [[ -z ${!key+x} ]]; then
       export "${key}=${value}"
     fi
-  done < <(yq -er 'to_entries[] | [.key, (.value // "")] | @tsv' "${config_file}")
+  done < <(yq -ber 'to_entries[] | [.key, (.value // "")] | @tsv' "${config_file}")
 }
 
 get_image_base_ref() {
@@ -75,7 +75,7 @@ get_agent_field() {
   [[ -f "${definition_file}" ]] || _die "Missing agent.yml for '${agent}'"
 
   local value
-  value="$(yq -r ".${field}" "${definition_file}")" || _die "Failed to read ${field} from ${definition_file}"
+  value="$(yq -br ".${field}" "${definition_file}")" || _die "Failed to read ${field} from ${definition_file}"
   [[ -n "${value}" && "${value}" != "null" ]] || _die "${field} missing in ${definition_file}"
   printf '%s\n' "${value}"
 }
@@ -97,7 +97,7 @@ get_agent_list_field() {
   [[ -d "${agent_dir}" ]] || _die "Agent '${agent}' not found under ${AGENT_DEFINITIONS_DIR}"
   [[ -f "${definition_file}" ]] || _die "Missing agent.yml for '${agent}'"
 
-  yq -r ".${field} // [] | .[]" "${definition_file}" ||
+  yq -br ".${field} // [] | .[]" "${definition_file}" ||
     _die "Failed to read ${field} from ${definition_file}"
 }
 
@@ -131,7 +131,7 @@ get_base_list_field() {
 
   [[ -f "${definition_file}" ]] || _die "Missing base.yml for ${alias} in ${bases_dir}"
 
-  yq -r ".${field} // [] | .[]" "${definition_file}" ||
+  yq -br ".${field} // [] | .[]" "${definition_file}" ||
     _die "Failed to read ${field} from ${definition_file}"
 }
 
@@ -207,7 +207,7 @@ get_bases() {
     if [[ ${#base_distro_exclude[@]} -gt 0 ]]; then
       base_yaml="${bases_dir}/${alias}/base.yml"
       [[ -f "${base_yaml}" ]] || _die "Missing base.yml for ${alias} in ${bases_dir}"
-      distro="$(yq -er '.base_image_distro' "${base_yaml}")" ||
+      distro="$(yq -ber '.base_image_distro' "${base_yaml}")" ||
         _die "Failed to read base_image_distro from ${base_yaml}"
       distro_lc="$(normalize_value "${distro}")"
       if list_contains "${distro_lc}" "${base_distro_exclude[@]}"; then
